@@ -4,9 +4,11 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
-)
 
+	"golang.org/x/image/tiff/lzw"
+)
 
 type TiffTagID uint16
 
@@ -171,34 +173,78 @@ var dataTypeNameMap = map[DataTypeID]string{
 	Double:    "Double",
 }
 
+type CompressionID uint16
+
+const (
+	Uncompressed CompressionID = 1
+	CCIT1D       CompressionID = 2
+	CCITGroup3   CompressionID = 3
+	CCITGroup4   CompressionID = 4
+	LZW          CompressionID = 5
+	JPEG         CompressionID = 6
+)
+
+func (compressionID CompressionID) Decompress(r io.Reader) ([]byte, error) {
+	var uncompressedData []byte
+	var err error
+
+	switch compressionID {
+	case LZW:
+		readCloser := lzw.NewReader(r, lzw.MSB, 8)
+		uncompressedData, err = ioutil.ReadAll(readCloser)
+		readCloser.Close()
+	}
+
+	return uncompressedData, err
+}
+
+var compressionNameMap = map[CompressionID]string{
+	Uncompressed: "Uncompressed",
+	CCIT1D:       "CCIT1D",
+	CCITGroup3:   "CCITGroup3",
+	CCITGroup4:   "CCITGroup4",
+	LZW:          "LZW",
+	JPEG:         "JPEG",
+}
+
+var compressionTypeMap = map[uint16]CompressionID{
+	1: Uncompressed,
+	2: CCIT1D,
+	3: CCITGroup3,
+	4: CCITGroup4,
+	5: LZW,
+	6: JPEG,
+}
+
 type TiffTag interface {
 	process(tiffFile *TiffFile, tagData *TiffTagData)
 
-	GetTagId() TiffTagID
+	GetTagID() TiffTagID
 	GetType() DataTypeID
+	String() string
 	GetValueAsString() string
 }
 
-type BaseTiffTag struct {
+type baseTiffTag struct {
 	TagId TiffTagID
 	Type  DataTypeID
 }
 
-func (tag *BaseTiffTag) processBaseTag(tagData *TiffTagData) {
+func (tag *baseTiffTag) processBaseTag(tagData *TiffTagData) {
 	tag.TagId = tagIdMap[tagData.TagId]
 	tag.Type = dataTypeMap[tagData.DataType]
 }
 
-func (tag *BaseTiffTag) GetTagId() TiffTagID {
+func (tag *baseTiffTag) GetTagID() TiffTagID {
 	return tag.TagId
 }
 
-func (tag *BaseTiffTag) GetType() DataTypeID {
+func (tag *baseTiffTag) GetType() DataTypeID {
 	return tag.Type
 }
 
 type ByteTiffTag struct {
-	BaseTiffTag
+	baseTiffTag
 
 	data []byte
 }
@@ -223,12 +269,16 @@ func (tag *ByteTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
 	}
 }
 
+func (tag *ByteTiffTag) String() string {
+	return tagNameMap[tag.TagId] + ": " + tag.GetValueAsString()
+}
+
 func (tag *ByteTiffTag) GetValueAsString() string {
 	return fmt.Sprint(tag.data)
 }
 
 type ASCIITiffTag struct {
-	BaseTiffTag
+	baseTiffTag
 
 	data string
 }
@@ -249,10 +299,11 @@ func (tag *ASCIITiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
 		tiffFile.file.Seek(startLocation, io.SeekStart)
 
 		tag.data = string(data)
-
-		
-		log.Printf("%s: %s\n", tagNameMap[tag.TagId], tag.data)
 	}
+}
+
+func (tag *ASCIITiffTag) String() string {
+	return tagNameMap[tag.TagId] + ": " + tag.GetValueAsString()
 }
 
 func (tag *ASCIITiffTag) GetValueAsString() string {
@@ -260,11 +311,10 @@ func (tag *ASCIITiffTag) GetValueAsString() string {
 }
 
 type ShortTiffTag struct {
-	BaseTiffTag
+	baseTiffTag
 
 	data []uint16
 }
-
 
 func (tag *ShortTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
 	tag.processBaseTag(tagData)
@@ -278,7 +328,7 @@ func (tag *ShortTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
 		// TODO: Do something with the error
 		tiffFile.file.Seek(startLocation, io.SeekStart)
 	} else {
-		tag.data[0] = uint16(tagData.DataOffset)
+		tag.data[0] = uint16(tagData.DataOffset & 0xffff)
 
 		if tagData.DataCount == 2 {
 			tag.data[1] = uint16(tagData.DataOffset >> 16)
@@ -286,16 +336,54 @@ func (tag *ShortTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
 	}
 }
 
+func (tag *ShortTiffTag) String() string {
+	return tagNameMap[tag.TagId] + ": " + tag.GetValueAsString()
+}
+
 func (tag *ShortTiffTag) GetValueAsString() string {
 	return fmt.Sprint(tag.data)
 }
 
+type RationalNumber struct {
+	Numerator  uint32
+	Denomiator uint32
+}
+
+func (rational *RationalNumber) GetValue() float64 {
+	return float64(rational.Numerator) / float64(rational.Denomiator)
+}
+
+type RationalTiffTag struct {
+	baseTiffTag
+
+	data []RationalNumber
+}
+
+func (tag *RationalTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
+	tag.processBaseTag(tagData)
+	tag.data = make([]RationalNumber, tagData.DataCount)
+
+	// TODO: Do something with the error
+	startLocation, _ := tiffFile.file.Seek(0, io.SeekCurrent)
+	tiffFile.file.Seek(int64(tagData.DataOffset), io.SeekStart)
+	binary.Read(tiffFile.file, tiffFile.header.Endian, &tag.data)
+	// TODO: Do something with the error
+	tiffFile.file.Seek(startLocation, io.SeekStart)
+}
+
+func (tag *RationalTiffTag) String() string {
+	return tagNameMap[tag.TagId] + ": " + tag.GetValueAsString()
+}
+
+func (tag *RationalTiffTag) GetValueAsString() string {
+	return fmt.Sprint(tag.data)
+}
+
 type LongTiffTag struct {
-	BaseTiffTag
+	baseTiffTag
 
 	data []uint32
 }
-
 
 func (tag *LongTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
 	tag.processBaseTag(tagData)
@@ -313,6 +401,10 @@ func (tag *LongTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
 	}
 }
 
+func (tag *LongTiffTag) String() string {
+	return tagNameMap[tag.TagId] + ": " + tag.GetValueAsString()
+}
+
 func (tag *LongTiffTag) GetValueAsString() string {
 	return fmt.Sprint(tag.data)
 }
@@ -324,12 +416,12 @@ type TiffTagData struct {
 	DataOffset uint32 /* The byte offset to the data items  */
 }
 
-func (ifd *ImageFileDirectory) processTags(tiffFile *TiffFile) error {
+func (ifd *ImageFileDirectory) processTags() error {
 	var err error
 	var tags []TiffTagData
 	tags = make([]TiffTagData, ifd.NumTags)
 
-	err = binary.Read(tiffFile.file, tiffFile.header.Endian, &tags)
+	err = binary.Read(ifd.tiffFile.file, ifd.tiffFile.header.Endian, &tags)
 	if err != nil {
 		return err
 	}
@@ -347,24 +439,29 @@ func (ifd *ImageFileDirectory) processTags(tiffFile *TiffFile) error {
 			switch dataType {
 			case Byte:
 				var byteTag ByteTiffTag
-				byteTag.process(tiffFile, &tag)
+				byteTag.process(ifd.tiffFile, &tag)
 
 				ifd.PutTiffTag(&byteTag)
 			case ASCII:
 				var asciiTag ASCIITiffTag
-				asciiTag.process(tiffFile, &tag)
+				asciiTag.process(ifd.tiffFile, &tag)
 
 				ifd.PutTiffTag(&asciiTag)
 			case Short:
 				var shortTag ShortTiffTag
-				shortTag.process(tiffFile, &tag)
+				shortTag.process(ifd.tiffFile, &tag)
 
 				ifd.PutTiffTag(&shortTag)
 			case Long:
 				var longTag LongTiffTag
-				longTag.process(tiffFile, &tag)
+				longTag.process(ifd.tiffFile, &tag)
 
 				ifd.PutTiffTag(&longTag)
+			case Rational:
+				var rationalTag RationalTiffTag
+				rationalTag.process(ifd.tiffFile, &tag)
+
+				ifd.PutTiffTag(&rationalTag)
 			default:
 				fmt.Printf("Unknown tag type %s\n", dataTypeNameMap[dataTypeMap[tag.DataType]])
 			}
