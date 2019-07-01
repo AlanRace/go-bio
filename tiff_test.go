@@ -18,7 +18,7 @@ func TestLoad(t *testing.T) {
 	}
 	defer tiffFile.Close()
 
-	ifdIndex := 5
+	ifdIndex := len(tiffFile.IFDList) - 2
 
 	//fmt.Println(tiffFile)
 	tiffFile.IFDList[ifdIndex].PrintMetadata()
@@ -40,7 +40,7 @@ func TestLoad(t *testing.T) {
 
 		//fmt.Println(tiffFile.IFDList[ifdIndex].GetTileAt(tiffFile.IFDList[0].GetImageDimensions()))
 
-		tileData, err := tileAccess.GetTileData(15, 15)
+		tileData, err := tileAccess.GetTileData(5, 5)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -60,6 +60,31 @@ func TestLoad(t *testing.T) {
 	stripAccess, ok := dataAccess.(*StripDataAccess)
 
 	if ok {
-		fmt.Println(stripAccess)
+		fmt.Println(stripAccess.GetStripDimensions())
+
+		stripData, err := stripAccess.GetData(stripAccess.GetDataIndexAt(180, 180))
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		data := make([]byte, len(stripData)/3*4)
+
+		for i := 0; i < len(data)/4; i++ {
+			data[i*4] = stripData[i*3]
+			data[i*4+1] = stripData[i*3+1]
+			data[i*4+2] = stripData[i*3+2]
+			data[i*4+3] = 255
+		}
+
+		stripWidth, stripLength := stripAccess.GetStripDimensions()
+		img := image.NewRGBA(image.Rect(0, 0, int(stripWidth), int(stripLength)))
+		img.Pix = data
+
+		f, err := os.Create("strip.png")
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+		png.Encode(f, img)
 	}
 }

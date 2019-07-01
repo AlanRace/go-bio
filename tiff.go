@@ -148,6 +148,22 @@ func (ifd *ImageFileDirectory) setUpDataAccess() error {
 		dataAccess.imageWidth, dataAccess.imageLength = ifd.GetImageDimensions()
 		dataAccess.compression = ifd.GetCompression()
 
+		dataAccess.rowsPerStrip = ifd.GetLongTagValue(RowsPerStrip)
+		dataAccess.stripsInImage = (dataAccess.imageWidth * (dataAccess.rowsPerStrip - 1)) / dataAccess.rowsPerStrip
+
+		stripOffsetsTag, ok := ifd.Tags[StripOffsets].(*LongTiffTag)
+		if !ok {
+			return &FormatError{msg: "Data stored as strips, but StripOffsets appear to be missing"}
+		}
+
+		stripByteCountsTag, ok := ifd.Tags[StripByteCounts].(*LongTiffTag)
+		if !ok {
+			return &FormatError{msg: "Data stored as strips, but StripByteCounts appear to be missing"}
+		}
+
+		dataAccess.offsets = stripOffsetsTag.data
+		dataAccess.byteCounts = stripByteCountsTag.data
+
 		return nil
 	} else if ifd.Tags[TileWidth] != nil {
 		var dataAccess TileDataAccess
@@ -173,8 +189,8 @@ func (ifd *ImageFileDirectory) setUpDataAccess() error {
 			return &FormatError{msg: "Data stored as tiles, but TileByteCounts appear to be missing"}
 		}
 
-		dataAccess.tileOffsets = tileOffsetsTag.data
-		dataAccess.tileByteCounts = tileByteCountsTag.data
+		dataAccess.offsets = tileOffsetsTag.data
+		dataAccess.byteCounts = tileByteCountsTag.data
 
 		return nil
 	} else {
@@ -250,7 +266,11 @@ func (ifd *ImageFileDirectory) GetCompression() CompressionID {
 
 type DataAccess interface {
 	// Requests data at a specific location, returns data (which could be larger than the requested region depending on tiling/slicing)
-	//GetData(file *io.File, rect image.Rectangle) ([]byte, image.Rectangle)
+	//GetData(rect image.Rectangle) ([]byte, image.Rectangle)
+
+	GetDataIndexAt(x uint32, y uint32) uint32
+	GetUncompressedData(index uint32) ([]byte, error)
+	GetData(index uint32) ([]byte, error)
 }
 
 type baseDataAccess struct {
@@ -260,12 +280,51 @@ type baseDataAccess struct {
 	imageLength uint32
 
 	compression CompressionID
+
+	offsets    []uint32
+	byteCounts []uint32
+}
+
+func (dataAccess *baseDataAccess) GetUncompressedData(index uint32) ([]byte, error) {
+	var byteData []byte
+	offset := dataAccess.offsets[index]
+	dataSize := dataAccess.byteCounts[index]
+
+	byteData = make([]byte, dataSize)
+
+	// TODO: Error checking!
+	dataAccess.tiffFile.file.Seek(int64(offset), io.SeekStart)
+	binary.Read(dataAccess.tiffFile.file, dataAccess.tiffFile.header.Endian, &byteData)
+
+	return byteData, nil
+}
+
+func (dataAccess *baseDataAccess) GetData(index uint32) ([]byte, error) {
+	byteData, err := dataAccess.GetUncompressedData(index)
+	if err != nil {
+		return nil, err
+	}
+
+	r := bytes.NewReader(byteData)
+
+	uncompressedData, err := dataAccess.compression.Decompress(r)
+
+	return uncompressedData, nil
 }
 
 type StripDataAccess struct {
 	baseDataAccess
 
-	rowsPerStrip uint32
+	rowsPerStrip  uint32
+	stripsInImage uint32
+}
+
+func (dataAccess *StripDataAccess) GetStripDimensions() (uint32, uint32) {
+	return dataAccess.imageWidth, dataAccess.rowsPerStrip
+}
+
+func (dataAccess *StripDataAccess) GetDataIndexAt(x uint32, y uint32) uint32 {
+	return y / dataAccess.rowsPerStrip
 }
 
 type TileDataAccess struct {
@@ -276,12 +335,8 @@ type TileDataAccess struct {
 
 	tilesAcross uint32
 	tilesDown   uint32
-
-	tileOffsets    []uint32
-	tileByteCounts []uint32
 }
 
-// Maybe have a TiledImageFileDirectory and a StrippedImageFileDirectory?
 func (dataAccess *TileDataAccess) GetTileDimensions() (uint32, uint32) {
 	return dataAccess.tileWidth, dataAccess.tileLength
 }
@@ -290,35 +345,22 @@ func (dataAccess *TileDataAccess) GetTileGrid() (uint32, uint32) {
 	return dataAccess.tilesAcross, dataAccess.tilesDown
 }
 
+func (dataAccess *TileDataAccess) GetDataIndexAt(x uint32, y uint32) uint32 {
+	return y*dataAccess.tilesAcross + x
+}
+
 func (dataAccess *TileDataAccess) GetTileAt(x uint32, y uint32) (uint32, uint32) {
 	return x / dataAccess.tileWidth, y / dataAccess.tileLength
 }
 
-func (dataAccess *TileDataAccess) GetUncompressedTileData(x uint32, y uint32) ([]byte, error) {
-	var byteData []byte
+/*func (dataAccess *TileDataAccess) GetUncompressedTileData(x uint32, y uint32) ([]byte, error) {
 	tileIndex := y*dataAccess.tilesAcross + x
 
-	tileOffset := dataAccess.tileOffsets[tileIndex]
-	dataSize := dataAccess.tileByteCounts[tileIndex]
-
-	byteData = make([]byte, dataSize)
-
-	// TODO: Error checking!
-	dataAccess.tiffFile.file.Seek(int64(tileOffset), io.SeekStart)
-	binary.Read(dataAccess.tiffFile.file, dataAccess.tiffFile.header.Endian, &byteData)
-
-	return byteData, nil
-}
+	return dataAccess.getUncompressedData(tileIndex)
+}*/
 
 func (dataAccess *TileDataAccess) GetTileData(x uint32, y uint32) ([]byte, error) {
-	byteData, err := dataAccess.GetUncompressedTileData(x, y)
-	if err != nil {
-		return nil, err
-	}
+	tileIndex := y*dataAccess.tilesAcross + x
 
-	r := bytes.NewReader(byteData)
-
-	uncompressedData, err := dataAccess.compression.Decompress(r)
-
-	return uncompressedData, nil
+	return dataAccess.GetData(tileIndex)
 }
