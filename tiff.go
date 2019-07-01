@@ -268,6 +268,23 @@ func (ifd *ImageFileDirectory) GetCompression() CompressionID {
 	return compressionTypeMap[compressionID]
 }
 
+func (ifd *ImageFileDirectory) GetDataIndexAt(x uint32, y uint32) uint32 {
+	return ifd.dataAccess.GetDataIndexAt(x, y)
+}
+
+func (ifd *ImageFileDirectory) GetCompressedData(index uint32) ([]byte, error) {
+	return ifd.dataAccess.GetCompressedData(index)
+}
+
+func (ifd *ImageFileDirectory) GetData(index uint32) ([]byte, error) {
+	return ifd.dataAccess.GetData(index)
+}
+
+func (ifd *ImageFileDirectory) GetFullData() ([]byte, error) {
+	return ifd.dataAccess.GetFullData()
+}
+
+
 type DataAccess interface {
 	// Requests data at a specific location, returns data (which could be larger than the requested region depending on tiling/slicing)
 	//GetData(rect image.Rectangle) ([]byte, image.Rectangle)
@@ -275,6 +292,7 @@ type DataAccess interface {
 	GetDataIndexAt(x uint32, y uint32) uint32
 	GetCompressedData(index uint32) ([]byte, error)
 	GetData(index uint32) ([]byte, error)
+	GetFullData() ([]byte, error)
 }
 
 type baseDataAccess struct {
@@ -387,11 +405,6 @@ func (dataAccess *StripDataAccess) GetFullData() ([]byte, error) {
 		}
 
 		copy(fullData[stripIndex*bytesPerStrip:], stripData)
-		/*if stripIndex < (dataAccess.stripsInImage - 2) {
-			fmt.Printf("%d (out of %d): %d\n", stripIndex, dataAccess.stripsInImage, copy(fullData[stripIndex*bytesPerStrip:(stripIndex+1)*bytesPerStrip], stripData))
-		} else {
-			fmt.Println(copy(fullData[stripIndex*bytesPerStrip:], stripData))
-		}*/
 	}
 
 	return fullData, nil
@@ -433,4 +446,10 @@ func (dataAccess *TileDataAccess) GetTileData(x uint32, y uint32) ([]byte, error
 	tileIndex := y*dataAccess.tilesAcross + x
 
 	return dataAccess.GetData(tileIndex)
+}
+
+
+func (dataAccess *TileDataAccess) GetFullData() ([]byte, error) {
+	
+	return nil, &FormatError{msg: "UNIMPLEMENTED GetFullData for TileDataAccess!!"}
 }

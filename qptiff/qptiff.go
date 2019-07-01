@@ -36,8 +36,8 @@ type QptiffFile struct {
 	FilterMap  map[string]*Filter
 
 	Thumbnail *tiff.ImageFileDirectory
-	Overview *tiff.ImageFileDirectory
-	Label *tiff.ImageFileDirectory
+	Overview  *tiff.ImageFileDirectory
+	Label     *tiff.ImageFileDirectory
 }
 
 type QptiffImageFileDirectory struct {
