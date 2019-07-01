@@ -19,6 +19,7 @@ func TestLoad(t *testing.T) {
 	defer tiffFile.Close()
 
 	ifdIndex := len(tiffFile.IFDList) - 2
+	ifdIndex = 5
 
 	//fmt.Println(tiffFile)
 	tiffFile.IFDList[ifdIndex].PrintMetadata()
@@ -67,17 +68,27 @@ func TestLoad(t *testing.T) {
 			log.Fatal(err)
 		}
 
-		data := make([]byte, len(stripData)/3*4)
+		fmt.Println(len(stripData))
+
+		fullData, err := stripAccess.GetFullData()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Println(len(fullData))
+
+		data := make([]byte, len(fullData)/3*4)
 
 		for i := 0; i < len(data)/4; i++ {
-			data[i*4] = stripData[i*3]
-			data[i*4+1] = stripData[i*3+1]
-			data[i*4+2] = stripData[i*3+2]
+			data[i*4] = fullData[i*3]
+			data[i*4+1] = fullData[i*3+1]
+			data[i*4+2] = fullData[i*3+2]
 			data[i*4+3] = 255
 		}
 
-		stripWidth, stripLength := stripAccess.GetStripDimensions()
-		img := image.NewRGBA(image.Rect(0, 0, int(stripWidth), int(stripLength)))
+		//stripWidth, stripLength := stripAccess.GetStripDimensions()
+		width, length := stripAccess.GetImageDimensions()
+		img := image.NewRGBA(image.Rect(0, 0, int(width), int(length)))
 		img.Pix = data
 
 		f, err := os.Create("strip.png")

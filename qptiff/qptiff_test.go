@@ -16,4 +16,7 @@ func TestLoad(t *testing.T) {
 	defer qptiffFile.Close()
 
 	fmt.Println(qptiffFile)
+
+	fmt.Println(qptiffFile.FilterMap["DAPI"])
+	
 }

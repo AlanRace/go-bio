@@ -139,17 +139,20 @@ func (tiffFile *TiffFile) processIFD(location uint32) error {
 }
 
 func (ifd *ImageFileDirectory) setUpDataAccess() error {
+	var err error
+
 	// Check if the data is tiled or stripped
 	if ifd.Tags[RowsPerStrip] != nil {
 		var dataAccess StripDataAccess
 		ifd.dataAccess = &dataAccess
 
-		dataAccess.tiffFile = ifd.tiffFile
-		dataAccess.imageWidth, dataAccess.imageLength = ifd.GetImageDimensions()
-		dataAccess.compression = ifd.GetCompression()
+		err = dataAccess.initialiseDataAccess(ifd)
+		if err != nil {
+			return err
+		}
 
 		dataAccess.rowsPerStrip = ifd.GetLongTagValue(RowsPerStrip)
-		dataAccess.stripsInImage = (dataAccess.imageWidth * (dataAccess.rowsPerStrip - 1)) / dataAccess.rowsPerStrip
+		dataAccess.stripsInImage = dataAccess.imageLength / dataAccess.rowsPerStrip
 
 		stripOffsetsTag, ok := ifd.Tags[StripOffsets].(*LongTiffTag)
 		if !ok {
@@ -169,9 +172,10 @@ func (ifd *ImageFileDirectory) setUpDataAccess() error {
 		var dataAccess TileDataAccess
 		ifd.dataAccess = &dataAccess
 
-		dataAccess.tiffFile = ifd.tiffFile
-		dataAccess.imageWidth, dataAccess.imageLength = ifd.GetImageDimensions()
-		dataAccess.compression = ifd.GetCompression()
+		err = dataAccess.initialiseDataAccess(ifd)
+		if err != nil {
+			return err
+		}
 
 		dataAccess.tileWidth = ifd.GetLongTagValue(TileWidth)
 		dataAccess.tileLength = ifd.GetLongTagValue(TileLength)
@@ -269,7 +273,7 @@ type DataAccess interface {
 	//GetData(rect image.Rectangle) ([]byte, image.Rectangle)
 
 	GetDataIndexAt(x uint32, y uint32) uint32
-	GetUncompressedData(index uint32) ([]byte, error)
+	GetCompressedData(index uint32) ([]byte, error)
 	GetData(index uint32) ([]byte, error)
 }
 
@@ -281,11 +285,34 @@ type baseDataAccess struct {
 
 	compression CompressionID
 
+	bitsPerSample   []uint16
+	samplesPerPixel uint16
+
 	offsets    []uint32
 	byteCounts []uint32
 }
 
-func (dataAccess *baseDataAccess) GetUncompressedData(index uint32) ([]byte, error) {
+func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) error {
+	dataAccess.tiffFile = ifd.tiffFile
+	dataAccess.imageWidth, dataAccess.imageLength = ifd.GetImageDimensions()
+	dataAccess.compression = ifd.GetCompression()
+	dataAccess.samplesPerPixel = ifd.GetShortTagValue(SamplesPerPixel)
+
+	bitsPerSampleTag, ok := ifd.Tags[BitsPerSample].(*ShortTiffTag)
+	if !ok {
+		return &FormatError{msg: "BitsPerSample tag appears to be missin"}
+	}
+
+	dataAccess.bitsPerSample = bitsPerSampleTag.data
+
+	return nil
+}
+
+func (dataAccess *baseDataAccess) GetImageDimensions() (uint32, uint32) {
+	return dataAccess.imageWidth, dataAccess.imageLength
+}
+
+func (dataAccess *baseDataAccess) GetCompressedData(index uint32) ([]byte, error) {
 	var byteData []byte
 	offset := dataAccess.offsets[index]
 	dataSize := dataAccess.byteCounts[index]
@@ -300,7 +327,7 @@ func (dataAccess *baseDataAccess) GetUncompressedData(index uint32) ([]byte, err
 }
 
 func (dataAccess *baseDataAccess) GetData(index uint32) ([]byte, error) {
-	byteData, err := dataAccess.GetUncompressedData(index)
+	byteData, err := dataAccess.GetCompressedData(index)
 	if err != nil {
 		return nil, err
 	}
@@ -310,6 +337,21 @@ func (dataAccess *baseDataAccess) GetData(index uint32) ([]byte, error) {
 	uncompressedData, err := dataAccess.compression.Decompress(r)
 
 	return uncompressedData, nil
+}
+
+func (dataAccess *baseDataAccess) PixelSizeInBytes() uint32 {
+	var size uint32
+	var sampleIndex uint16
+
+	for sampleIndex = 0; sampleIndex < dataAccess.samplesPerPixel; sampleIndex++ {
+		size += uint32(dataAccess.bitsPerSample[sampleIndex] / 8)
+	}
+
+	return size
+}
+
+func (dataAccess *baseDataAccess) ImageSizeInBytes() uint32 {
+	return dataAccess.imageWidth * dataAccess.imageLength * dataAccess.PixelSizeInBytes()
 }
 
 type StripDataAccess struct {
@@ -325,6 +367,34 @@ func (dataAccess *StripDataAccess) GetStripDimensions() (uint32, uint32) {
 
 func (dataAccess *StripDataAccess) GetDataIndexAt(x uint32, y uint32) uint32 {
 	return y / dataAccess.rowsPerStrip
+}
+
+func (dataAccess *StripDataAccess) GetStripInBytes() uint32 {
+	return dataAccess.imageWidth * dataAccess.rowsPerStrip * dataAccess.PixelSizeInBytes()
+}
+
+func (dataAccess *StripDataAccess) GetFullData() ([]byte, error) {
+	var stripIndex uint32
+	fullData := make([]byte, dataAccess.ImageSizeInBytes())
+
+	bytesPerStrip := dataAccess.GetStripInBytes()
+
+	for stripIndex = 0; stripIndex < dataAccess.stripsInImage; stripIndex++ {
+		stripData, err := dataAccess.GetData(stripIndex)
+
+		if err != nil {
+			return nil, err
+		}
+
+		copy(fullData[stripIndex*bytesPerStrip:], stripData)
+		/*if stripIndex < (dataAccess.stripsInImage - 2) {
+			fmt.Printf("%d (out of %d): %d\n", stripIndex, dataAccess.stripsInImage, copy(fullData[stripIndex*bytesPerStrip:(stripIndex+1)*bytesPerStrip], stripData))
+		} else {
+			fmt.Println(copy(fullData[stripIndex*bytesPerStrip:], stripData))
+		}*/
+	}
+
+	return fullData, nil
 }
 
 type TileDataAccess struct {
