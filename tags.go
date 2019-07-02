@@ -193,6 +193,8 @@ func (compressionID CompressionID) Decompress(r io.Reader) ([]byte, error) {
 		readCloser := lzw.NewReader(r, lzw.MSB, 8)
 		uncompressedData, err = ioutil.ReadAll(readCloser)
 		readCloser.Close()
+	default:
+		return nil, &FormatError{msg: "Unsupported compression scheme"}
 	}
 
 	return uncompressedData, err
@@ -214,6 +216,46 @@ var compressionTypeMap = map[uint16]CompressionID{
 	4: CCITGroup4,
 	5: LZW,
 	6: JPEG,
+}
+
+type PhotometricInterpretationID uint16
+
+const (
+	WhiteIsZero      PhotometricInterpretationID = 0
+	BlackIsZero      PhotometricInterpretationID = 1
+	RGB              PhotometricInterpretationID = 2
+	PaletteColour    PhotometricInterpretationID = 3
+	TransparencyMask PhotometricInterpretationID = 4
+	CMYK             PhotometricInterpretationID = 5
+	YCbCr            PhotometricInterpretationID = 6
+	CIELab           PhotometricInterpretationID = 8
+	ICCLab           PhotometricInterpretationID = 9
+	ITULab           PhotometricInterpretationID = 10
+)
+
+var photometricInterpretationNameMap = map[PhotometricInterpretationID]string{
+	WhiteIsZero:      "WhiteIsZero",
+	BlackIsZero:      "BlackIsZero",
+	RGB:              "RGB",
+	PaletteColour:    "PaletteColour",
+	TransparencyMask: "TransparencyMask",
+	YCbCr:            "YCbCr",
+	CIELab:           "CIELab",
+	ICCLab:           "ICCLab",
+	ITULab:           "ITULab",
+}
+
+var photometricInterpretationTypeMap = map[uint16]PhotometricInterpretationID{
+	0:  WhiteIsZero,
+	1:  BlackIsZero,
+	2:  RGB,
+	3:  PaletteColour,
+	4:  TransparencyMask,
+	5: CMYK,
+	6:  YCbCr,
+	8:  CIELab,
+	9:  ICCLab,
+	10: ITULab,
 }
 
 type TiffTag interface {

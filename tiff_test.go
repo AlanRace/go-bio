@@ -70,7 +70,7 @@ func TestLoad(t *testing.T) {
 
 		fmt.Println(len(stripData))
 
-		fullData, err := stripAccess.GetFullData()
+		/*fullData, err := stripAccess.GetFullData()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -89,7 +89,12 @@ func TestLoad(t *testing.T) {
 		//stripWidth, stripLength := stripAccess.GetStripDimensions()
 		width, length := stripAccess.GetImageDimensions()
 		img := image.NewRGBA(image.Rect(0, 0, int(width), int(length)))
-		img.Pix = data
+		img.Pix = data*/
+
+		img, err := stripAccess.GetImage()
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		f, err := os.Create("strip.png")
 		if err != nil {

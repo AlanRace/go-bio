@@ -22,7 +22,10 @@ func TestLoad(t *testing.T) {
 
 	fmt.Println(qptiffFile.FilterMap["DAPI"])
 
-	fullData := qptiffFile.Label.GetFullData()
+	/*fullData, err := qptiffFile.Label.GetFullData()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	data := make([]byte, len(fullData)/3*4)
 
@@ -33,9 +36,16 @@ func TestLoad(t *testing.T) {
 		data[i*4+3] = 255
 	}
 
+	qptiffFile.Label.PrintMetadata()
+
 	width, length := qptiffFile.Label.GetImageDimensions()
 	img := image.NewRGBA(image.Rect(0, 0, int(width), int(length)))
-	img.Pix = data
+	img.Pix = data*/
+
+	img, err := qptiffFile.Label.GetImage()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	f, err := os.Create("label.png")
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"image"
 	"io"
 	"os"
 )
@@ -268,6 +269,12 @@ func (ifd *ImageFileDirectory) GetCompression() CompressionID {
 	return compressionTypeMap[compressionID]
 }
 
+func (ifd *ImageFileDirectory) GetPhotometricInterpretation() PhotometricInterpretationID {
+	photometricInterpretationID := ifd.GetShortTagValue(PhotometricInterpretation)
+
+	return photometricInterpretationTypeMap[photometricInterpretationID]
+}
+
 func (ifd *ImageFileDirectory) GetDataIndexAt(x uint32, y uint32) uint32 {
 	return ifd.dataAccess.GetDataIndexAt(x, y)
 }
@@ -283,7 +290,6 @@ func (ifd *ImageFileDirectory) GetData(index uint32) ([]byte, error) {
 func (ifd *ImageFileDirectory) GetFullData() ([]byte, error) {
 	return ifd.dataAccess.GetFullData()
 }
-
 
 type DataAccess interface {
 	// Requests data at a specific location, returns data (which could be larger than the requested region depending on tiling/slicing)
@@ -301,7 +307,8 @@ type baseDataAccess struct {
 	imageWidth  uint32
 	imageLength uint32
 
-	compression CompressionID
+	compression               CompressionID
+	photometricInterpretation PhotometricInterpretationID
 
 	bitsPerSample   []uint16
 	samplesPerPixel uint16
@@ -314,6 +321,7 @@ func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) 
 	dataAccess.tiffFile = ifd.tiffFile
 	dataAccess.imageWidth, dataAccess.imageLength = ifd.GetImageDimensions()
 	dataAccess.compression = ifd.GetCompression()
+	dataAccess.photometricInterpretation = ifd.GetPhotometricInterpretation()
 	dataAccess.samplesPerPixel = ifd.GetShortTagValue(SamplesPerPixel)
 
 	bitsPerSampleTag, ok := ifd.Tags[BitsPerSample].(*ShortTiffTag)
@@ -372,6 +380,31 @@ func (dataAccess *baseDataAccess) ImageSizeInBytes() uint32 {
 	return dataAccess.imageWidth * dataAccess.imageLength * dataAccess.PixelSizeInBytes()
 }
 
+func (dataAccess *baseDataAccess) createImage(fullData []byte) (image.Image, error) {
+	var img image.Image
+
+	switch dataAccess.photometricInterpretation {
+	case RGB:
+		rgbImg := image.NewRGBA(image.Rect(0, 0, int(dataAccess.imageWidth), int(dataAccess.imageLength)))
+		data := make([]byte, len(fullData)/3*4)
+
+		for i := 0; i < len(data)/4; i++ {
+			data[i*4] = fullData[i*3]
+			data[i*4+1] = fullData[i*3+1]
+			data[i*4+2] = fullData[i*3+2]
+			data[i*4+3] = 255
+		}
+
+		rgbImg.Pix = data
+
+		img = rgbImg
+	default:
+		return nil, &FormatError{msg: "Unsupported PhotometricInterpretation: " + photometricInterpretationNameMap[dataAccess.photometricInterpretation]}
+	}
+
+	return img, nil
+}
+
 type StripDataAccess struct {
 	baseDataAccess
 
@@ -408,6 +441,15 @@ func (dataAccess *StripDataAccess) GetFullData() ([]byte, error) {
 	}
 
 	return fullData, nil
+}
+
+func (dataAccess *StripDataAccess) GetImage() (image.Image, error) {
+	fullData, err := dataAccess.GetFullData()
+	if err != nil {
+		return nil, err
+	}
+
+	return dataAccess.createImage(fullData)
 }
 
 type TileDataAccess struct {
@@ -448,8 +490,16 @@ func (dataAccess *TileDataAccess) GetTileData(x uint32, y uint32) ([]byte, error
 	return dataAccess.GetData(tileIndex)
 }
 
-
 func (dataAccess *TileDataAccess) GetFullData() ([]byte, error) {
-	
+
 	return nil, &FormatError{msg: "UNIMPLEMENTED GetFullData for TileDataAccess!!"}
+}
+
+func (dataAccess *TileDataAccess) GetImage() (image.Image, error) {
+	fullData, err := dataAccess.GetFullData()
+	if err != nil {
+		return nil, err
+	}
+
+	return dataAccess.createImage(fullData)
 }
