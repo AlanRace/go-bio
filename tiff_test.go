@@ -19,12 +19,13 @@ func TestLoad(t *testing.T) {
 	defer tiffFile.Close()
 
 	ifdIndex := len(tiffFile.IFDList) - 2
-	ifdIndex = 5
+	//ifdIndex = 5
 
 	//fmt.Println(tiffFile)
 	tiffFile.IFDList[ifdIndex].PrintMetadata()
 
 	fmt.Println(tiffFile.IFDList[ifdIndex].GetImageDimensions())
+	fmt.Println(tiffFile.IFDList[ifdIndex].GetResolution())
 
 	dataAccess := tiffFile.IFDList[ifdIndex].dataAccess
 

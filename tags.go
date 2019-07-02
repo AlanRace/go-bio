@@ -251,11 +251,31 @@ var photometricInterpretationTypeMap = map[uint16]PhotometricInterpretationID{
 	2:  RGB,
 	3:  PaletteColour,
 	4:  TransparencyMask,
-	5: CMYK,
+	5:  CMYK,
 	6:  YCbCr,
 	8:  CIELab,
 	9:  ICCLab,
 	10: ITULab,
+}
+
+type ResolutionUnitID uint16
+
+const (
+	NoUnit     ResolutionUnitID = 1
+	Inch       ResolutionUnitID = 2
+	Centimeter ResolutionUnitID = 3
+)
+
+var resolutionUnitNameMap = map[ResolutionUnitID]string{
+	NoUnit:     "NoUnit",
+	Inch:       "Inch",
+	Centimeter: "Centimeter",
+}
+
+var resolutionUnitTypeMap = map[uint16]ResolutionUnitID{
+	1: NoUnit,
+	2: Inch,
+	3: Centimeter,
 }
 
 type TiffTag interface {
@@ -386,9 +406,10 @@ func (tag *ShortTiffTag) GetValueAsString() string {
 	return fmt.Sprint(tag.data)
 }
 
+// TODO: Check why this order of the member variables works and the other way around doesn't...
 type RationalNumber struct {
-	Numerator  uint32
 	Denomiator uint32
+	Numerator  uint32
 }
 
 func (rational *RationalNumber) GetValue() float64 {

@@ -5,7 +5,6 @@ import (
 	"log"
 	"testing"
 	"os"
-	"image"
 	"image/png"
 )
 
@@ -19,8 +18,6 @@ func TestLoad(t *testing.T) {
 	defer qptiffFile.Close()
 
 	fmt.Println(qptiffFile)
-
-	fmt.Println(qptiffFile.FilterMap["DAPI"])
 
 	/*fullData, err := qptiffFile.Label.GetFullData()
 	if err != nil {
@@ -42,6 +39,13 @@ func TestLoad(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, int(width), int(length)))
 	img.Pix = data*/
 
+	dapi := qptiffFile.FilterMap["DAPI"]
+	
+	for _, ifd := range dapi.IFDList {
+		fmt.Println(ifd.GetImageDimensions())
+		fmt.Println(ifd.GetResolution())
+	}
+
 	img, err := qptiffFile.Label.GetImage()
 	if err != nil {
 		log.Fatal(err)
@@ -51,6 +55,30 @@ func TestLoad(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	defer f.Close()
 	png.Encode(f, img)
+	f.Close()
+
+	img, err = qptiffFile.Overview.GetImage()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	f, err = os.Create("overview.png")
+	if err != nil {
+		panic(err)
+	}
+	png.Encode(f, img)
+	f.Close()
+
+	img, err = qptiffFile.Thumbnail.GetImage()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	f, err = os.Create("thumbnail.png")
+	if err != nil {
+		panic(err)
+	}
+	png.Encode(f, img)
+	f.Close()
 }

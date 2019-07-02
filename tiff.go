@@ -259,14 +259,37 @@ func (ifd *ImageFileDirectory) GetLongTagValue(tagId TiffTagID) uint32 {
 	return value
 }
 
+func (ifd *ImageFileDirectory) GetRationalTagValue(tagId TiffTagID) float64 {
+	tag := ifd.Tags[tagId]
+
+	rationalTag, ok := tag.(*RationalTiffTag)
+
+	if !ok {
+		// TODO: Error
+	}
+
+	// TODO: Decide what to do when more than 1 value
+	return rationalTag.data[0].GetValue()
+}
+
 func (ifd *ImageFileDirectory) GetImageDimensions() (uint32, uint32) {
 	return ifd.GetLongTagValue(ImageWidth), ifd.GetLongTagValue(ImageLength)
+}
+
+func (ifd *ImageFileDirectory) GetResolution() (float64, float64, ResolutionUnitID) {
+	return ifd.GetRationalTagValue(XResolution), ifd.GetRationalTagValue(YResolution), ifd.GetResolutionUnit()
 }
 
 func (ifd *ImageFileDirectory) GetCompression() CompressionID {
 	compressionID := ifd.GetShortTagValue(Compression)
 
 	return compressionTypeMap[compressionID]
+}
+
+func (ifd *ImageFileDirectory) GetResolutionUnit() ResolutionUnitID {
+		resolutionUnitID := ifd.GetShortTagValue(ResolutionUnit)
+
+		return resolutionUnitTypeMap[resolutionUnitID]
 }
 
 func (ifd *ImageFileDirectory) GetPhotometricInterpretation() PhotometricInterpretationID {
