@@ -291,6 +291,10 @@ func (ifd *ImageFileDirectory) GetFullData() ([]byte, error) {
 	return ifd.dataAccess.GetFullData()
 }
 
+func (ifd *ImageFileDirectory) GetImage() (image.Image, error) {
+	return ifd.dataAccess.GetImage()
+}
+
 type DataAccess interface {
 	// Requests data at a specific location, returns data (which could be larger than the requested region depending on tiling/slicing)
 	//GetData(rect image.Rectangle) ([]byte, image.Rectangle)
@@ -299,6 +303,7 @@ type DataAccess interface {
 	GetCompressedData(index uint32) ([]byte, error)
 	GetData(index uint32) ([]byte, error)
 	GetFullData() ([]byte, error)
+	GetImage() (image.Image, error)
 }
 
 type baseDataAccess struct {
