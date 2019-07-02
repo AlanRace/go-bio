@@ -12,7 +12,7 @@ import (
 const (
 	LittleEndianMarker uint16 = 0x4949
 	BigEndianMarker    uint16 = 0x4d4d
-	TiffVersionMarker  uint16 = 0x2a
+	VersionMarker      uint16 = 0x2a
 )
 
 type ImageFileHeader struct {
@@ -78,7 +78,7 @@ func Open(path string) (*TiffFile, error) {
 		return nil, err
 	}
 
-	if header.Version != TiffVersionMarker {
+	if header.Version != VersionMarker {
 		return nil, &FormatError{msg: "Unsupported tiff version"}
 	}
 
