@@ -30,7 +30,7 @@ var imageTypeMap = map[string]ImageType{
 }
 
 type File struct {
-	tiff.TiffFile
+	tiff.File
 
 	FilterList []string
 	FilterMap  map[string]*Filter
@@ -85,7 +85,7 @@ func Open(path string) (*File, error) {
 	var qptiffFile File
 	tiffFile, err := tiff.Open(path)
 
-	qptiffFile.TiffFile = *tiffFile
+	qptiffFile.File = *tiffFile
 	qptiffFile.FilterMap = make(map[string]*Filter)
 
 	for _, ifd := range tiffFile.IFDList {

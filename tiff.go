@@ -3,6 +3,7 @@ package tiff
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"image"
 	"io"
@@ -28,11 +29,11 @@ type ImageFileDirectory struct {
 	Tags          map[TagID]Tag
 	NextIFDOffset uint32
 
-	tiffFile   *TiffFile
+	tiffFile   *File
 	dataAccess DataAccess
 }
 
-type TiffFile struct {
+type File struct {
 	file *os.File
 
 	header  ImageFileHeader
@@ -46,9 +47,9 @@ type FormatError struct {
 
 func (e *FormatError) Error() string { return e.msg }
 
-func Open(path string) (*TiffFile, error) {
+func Open(path string) (*File, error) {
 	var err error
-	var tiffFile TiffFile
+	var tiffFile File
 	header := &tiffFile.header
 
 	tiffFile.file, err = os.Open(path)
@@ -97,11 +98,11 @@ func Open(path string) (*TiffFile, error) {
 	return &tiffFile, nil
 }
 
-func (tiffFile *TiffFile) Close() {
+func (tiffFile *File) Close() {
 	tiffFile.file.Close()
 }
 
-func (tiffFile *TiffFile) processIFD(location uint32) error {
+func (tiffFile *File) processIFD(location uint32) error {
 	var ifd ImageFileDirectory
 	var err error
 
@@ -280,6 +281,14 @@ func (ifd *ImageFileDirectory) GetResolution() (float64, float64, ResolutionUnit
 	return ifd.GetRationalTagValue(XResolution), ifd.GetRationalTagValue(YResolution), ifd.GetResolutionUnit()
 }
 
+func (ifd *ImageFileDirectory) GetBitsPerSample() uint16 {
+	return ifd.GetShortTagValue(BitsPerSample)
+}
+
+func (ifd *ImageFileDirectory) GetSamplesPerPixel() uint16 {
+	return ifd.GetShortTagValue(SamplesPerPixel)
+}
+
 func (ifd *ImageFileDirectory) GetCompression() CompressionID {
 	compressionID := ifd.GetShortTagValue(Compression)
 
@@ -318,6 +327,14 @@ func (ifd *ImageFileDirectory) GetImage() (image.Image, error) {
 	return ifd.dataAccess.GetImage()
 }
 
+func (ifd *ImageFileDirectory) IsTiled() bool {
+	return ifd.GetTag(TileWidth) != nil
+}
+
+func (ifd *ImageFileDirectory) GetDataAccess() DataAccess {
+	return ifd.dataAccess
+}
+
 type DataAccess interface {
 	// Requests data at a specific location, returns data (which could be larger than the requested region depending on tiling/slicing)
 	//GetData(rect image.Rectangle) ([]byte, image.Rectangle)
@@ -330,7 +347,8 @@ type DataAccess interface {
 }
 
 type baseDataAccess struct {
-	tiffFile *TiffFile
+	tiffFile *File
+	ifd      *ImageFileDirectory
 
 	imageWidth  uint32
 	imageLength uint32
@@ -347,6 +365,7 @@ type baseDataAccess struct {
 
 func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) error {
 	dataAccess.tiffFile = ifd.tiffFile
+	dataAccess.ifd = ifd
 	dataAccess.imageWidth, dataAccess.imageLength = ifd.GetImageDimensions()
 	dataAccess.compression = ifd.GetCompression()
 	dataAccess.photometricInterpretation = ifd.GetPhotometricInterpretation()
@@ -354,7 +373,7 @@ func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) 
 
 	bitsPerSampleTag, ok := ifd.Tags[BitsPerSample].(*ShortTag)
 	if !ok {
-		return &FormatError{msg: "BitsPerSample tag appears to be missin"}
+		return &FormatError{msg: "BitsPerSample tag appears to be missing"}
 	}
 
 	dataAccess.bitsPerSample = bitsPerSampleTag.data
@@ -381,16 +400,60 @@ func (dataAccess *baseDataAccess) GetCompressedData(index uint32) ([]byte, error
 }
 
 func (dataAccess *baseDataAccess) GetData(index uint32) ([]byte, error) {
+	var r io.Reader
 	byteData, err := dataAccess.GetCompressedData(index)
 	if err != nil {
 		return nil, err
 	}
+	if dataAccess.ifd.GetTag(JPEGTables) != nil {
+		tablesTag, ok := dataAccess.ifd.GetTag(JPEGTables).(*ByteTag)
+		if !ok {
+			return nil, &FormatError{msg: "JPEGTables not recorded as byte"}
+		}
+		fmt.Println(hex.EncodeToString(byteData[2:]))
+		fmt.Println(hex.EncodeToString(tablesTag.data[:len(tablesTag.data)-2]))
+		//fmt.Println(hex.EncodeToString(append(tablesTag.data[:len(tablesTag.data)-2], byteData[2:]...)))
 
-	r := bytes.NewReader(byteData)
+		f1, err := os.Create("header.bin")
+		if err != nil {
+			return nil, err
+		}
+		defer f1.Close()
 
-	uncompressedData, err := dataAccess.compression.Decompress(r)
+		_, err = f1.Write(tablesTag.data)
+		if err != nil {
+			return nil, err
+		}
 
-	return uncompressedData, nil
+		f2, err := os.Create("body.bin")
+		if err != nil {
+			return nil, err
+		}
+		defer f2.Close()
+
+		_, err = f2.Write(byteData)
+		if err != nil {
+			return nil, err
+		}
+
+		f, err := os.Create("testnodecode.jpg")
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+
+		_, err = f.Write(append(tablesTag.data[:len(tablesTag.data)-2], byteData[2:]...))
+		if err != nil {
+			return nil, err
+		}
+
+		r = bytes.NewReader(append(tablesTag.data[:len(tablesTag.data)-2], byteData[2:]...))
+
+	} else {
+		r = bytes.NewReader(byteData)
+	}
+
+	return dataAccess.compression.Decompress(r)
 }
 
 func (dataAccess *baseDataAccess) PixelSizeInBytes() uint32 {

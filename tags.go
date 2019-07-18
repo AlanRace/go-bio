@@ -3,9 +3,13 @@ package tiff
 import (
 	"encoding/binary"
 	"fmt"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"io/ioutil"
 	"log"
+	"os"
+	"strconv"
 
 	"golang.org/x/image/tiff/lzw"
 )
@@ -14,6 +18,7 @@ import (
 type TagID uint16
 
 const (
+	NewSubFileType TagID = 254
 	// ImageWidth describes the width of the image in pixels.
 	ImageWidth TagID = 256
 	// ImageLength describes the length (height) of the image in pixels.
@@ -24,6 +29,7 @@ const (
 	Compression TagID = 259
 	// PhotometricInterpretation describes the way that pixel data is stored.
 	PhotometricInterpretation TagID = 262
+	ImageDescription          TagID = 270
 	// Make describes the make of the microscope used to acquire the data.
 	Make TagID = 271
 	// Model describes the model of the microscope used to acquire the data.
@@ -37,11 +43,12 @@ const (
 	XResolution         TagID = 282
 	YResolution         TagID = 283
 	PlanarConfiguration TagID = 284
+	XPosition           TagID = 286
+	YPosition           TagID = 287
 	ResolutionUnit      TagID = 296
 	Software            TagID = 305
 	DateTime            TagID = 306
-	YCbCrSubSampling    TagID = 530
-	ReferenceBlackWhite TagID = 532
+	Predictor           TagID = 317
 	TileWidth           TagID = 322
 	TileLength          TagID = 323
 	TileOffsets         TagID = 324
@@ -49,10 +56,9 @@ const (
 	SampleFormat        TagID = 339
 	SMinSampleValue     TagID = 340
 	SMaxSampleValue     TagID = 341
-	NewSubFileType      TagID = 254
-	ImageDescription    TagID = 270
-	XPosition           TagID = 286
-	YPosition           TagID = 287
+	JPEGTables          TagID = 347
+	YCbCrSubSampling    TagID = 530
+	ReferenceBlackWhite TagID = 532
 
 	// Probable NDPI specific
 	//XOffsetFromSlideCentre TagID = 65422
@@ -61,11 +67,13 @@ const (
 )
 
 var tagIDMap = map[uint16]TagID{
+	254: NewSubFileType,
 	256: ImageWidth,
 	257: ImageLength,
 	258: BitsPerSample,
 	259: Compression,
 	262: PhotometricInterpretation,
+	270: ImageDescription,
 	271: Make,
 	272: Model,
 	273: StripOffsets,
@@ -74,12 +82,13 @@ var tagIDMap = map[uint16]TagID{
 	279: StripByteCounts,
 	282: XResolution,
 	283: YResolution,
+	286: XPosition,
+	287: YPosition,
 	284: PlanarConfiguration,
 	296: ResolutionUnit,
 	305: Software,
 	306: DateTime,
-	530: YCbCrSubSampling,
-	532: ReferenceBlackWhite,
+	317: Predictor,
 	322: TileWidth,
 	323: TileLength,
 	324: TileOffsets,
@@ -87,10 +96,9 @@ var tagIDMap = map[uint16]TagID{
 	339: SampleFormat,
 	340: SMinSampleValue,
 	341: SMaxSampleValue,
-	254: NewSubFileType,
-	270: ImageDescription,
-	286: XPosition,
-	287: YPosition,
+	347: JPEGTables,
+	530: YCbCrSubSampling,
+	532: ReferenceBlackWhite,
 
 	// NDPI specific?
 	//65422: XOffsetFromSlideCentre,
@@ -129,6 +137,8 @@ var tagNameMap = map[TagID]string{
 	ImageDescription:          "ImageDescription",
 	XPosition:                 "XPosition",
 	YPosition:                 "YPosition",
+	JPEGTables:                "JPEGTables",
+	Predictor:                 "Predictor",
 
 	// NDPI Specific?
 	//XOffsetFromSlideCentre: "XOffsetFromSlideCentre",
@@ -145,7 +155,7 @@ const (
 	Long      DataTypeID = 4
 	Rational  DataTypeID = 5
 	SByte     DataTypeID = 6
-	Undefine  DataTypeID = 7
+	Undefined DataTypeID = 7
 	SShort    DataTypeID = 8
 	SLong     DataTypeID = 9
 	SRational DataTypeID = 10
@@ -160,7 +170,7 @@ var dataTypeMap = map[uint16]DataTypeID{
 	4:  Long,
 	5:  Rational,
 	6:  SByte,
-	7:  Undefine,
+	7:  Undefined,
 	8:  SShort,
 	9:  SLong,
 	10: SRational,
@@ -175,7 +185,7 @@ var dataTypeNameMap = map[DataTypeID]string{
 	Long:      "Long",
 	Rational:  "Rational",
 	SByte:     "SByte",
-	Undefine:  "Undefine",
+	Undefined: "Undefined",
 	SShort:    "SShort",
 	SLong:     "SLong",
 	SRational: "SRational",
@@ -191,7 +201,8 @@ const (
 	CCITGroup3   CompressionID = 3
 	CCITGroup4   CompressionID = 4
 	LZW          CompressionID = 5
-	JPEG         CompressionID = 6
+	OJPEG        CompressionID = 6
+	JPEG         CompressionID = 7
 )
 
 // Decompress decompresses the data supplied in the io.Reader using the compression method dictated by CompressionID.
@@ -204,11 +215,28 @@ func (compressionID CompressionID) Decompress(r io.Reader) ([]byte, error) {
 		readCloser := lzw.NewReader(r, lzw.MSB, 8)
 		uncompressedData, err = ioutil.ReadAll(readCloser)
 		readCloser.Close()
+	case JPEG:
+		img, err := jpeg.Decode(r)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(img.At(0, 0).RGBA())
+		f, err := os.Create("TESTDECODE.png")
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+		png.Encode(f, img)
+		//uncompressedData = img.Pix
 	default:
-		return nil, &FormatError{msg: "Unsupported compression scheme"}
+		return nil, &FormatError{msg: "Unsupported compression scheme: " + compressionID.String()}
 	}
 
 	return uncompressedData, err
+}
+
+func (compressionID CompressionID) String() string {
+	return compressionNameMap[compressionID] + " (" + strconv.Itoa(int(compressionID)) + ")"
 }
 
 var compressionNameMap = map[CompressionID]string{
@@ -217,6 +245,7 @@ var compressionNameMap = map[CompressionID]string{
 	CCITGroup3:   "CCITGroup3",
 	CCITGroup4:   "CCITGroup4",
 	LZW:          "LZW",
+	OJPEG:        "OJPEG",
 	JPEG:         "JPEG",
 }
 
@@ -226,7 +255,8 @@ var compressionTypeMap = map[uint16]CompressionID{
 	3: CCITGroup3,
 	4: CCITGroup4,
 	5: LZW,
-	6: JPEG,
+	6: OJPEG,
+	7: JPEG,
 }
 
 type PhotometricInterpretationID uint16
@@ -269,6 +299,10 @@ var photometricInterpretationTypeMap = map[uint16]PhotometricInterpretationID{
 	10: ITULab,
 }
 
+func (photometricInterpretationID PhotometricInterpretationID) String() string {
+	return photometricInterpretationNameMap[photometricInterpretationID] + " (" + strconv.Itoa(int(photometricInterpretationID)) + ")"
+}
+
 type ResolutionUnitID uint16
 
 const (
@@ -290,7 +324,7 @@ var resolutionUnitTypeMap = map[uint16]ResolutionUnitID{
 }
 
 type Tag interface {
-	process(tiffFile *TiffFile, tagData *TagData)
+	process(tiffFile *File, tagData *TagData)
 
 	GetTagID() TagID
 	GetType() DataTypeID
@@ -322,7 +356,7 @@ type ByteTag struct {
 	data []byte
 }
 
-func (tag *ByteTag) process(tiffFile *TiffFile, tagData *TagData) {
+func (tag *ByteTag) process(tiffFile *File, tagData *TagData) {
 	tag.processBaseTag(tagData)
 
 	if tagData.DataCount <= 4 {
@@ -356,7 +390,7 @@ type ASCIITag struct {
 	data string
 }
 
-func (tag *ASCIITag) process(tiffFile *TiffFile, tagData *TagData) {
+func (tag *ASCIITag) process(tiffFile *File, tagData *TagData) {
 	tag.processBaseTag(tagData)
 	data := make([]byte, tagData.DataCount)
 
@@ -389,7 +423,7 @@ type ShortTag struct {
 	data []uint16
 }
 
-func (tag *ShortTag) process(tiffFile *TiffFile, tagData *TagData) {
+func (tag *ShortTag) process(tiffFile *File, tagData *TagData) {
 	tag.processBaseTag(tagData)
 	tag.data = make([]uint16, tagData.DataCount)
 
@@ -433,7 +467,7 @@ type RationalTag struct {
 	data []RationalNumber
 }
 
-func (tag *RationalTag) process(tiffFile *TiffFile, tagData *TagData) {
+func (tag *RationalTag) process(tiffFile *File, tagData *TagData) {
 	tag.processBaseTag(tagData)
 	tag.data = make([]RationalNumber, tagData.DataCount)
 
@@ -459,7 +493,7 @@ type LongTag struct {
 	data []uint32
 }
 
-func (tag *LongTag) process(tiffFile *TiffFile, tagData *TagData) {
+func (tag *LongTag) process(tiffFile *File, tagData *TagData) {
 	tag.processBaseTag(tagData)
 	tag.data = make([]uint32, tagData.DataCount)
 
@@ -537,6 +571,11 @@ func (ifd *ImageFileDirectory) processTags() error {
 				rationalTag.process(ifd.tiffFile, &tag)
 
 				ifd.PutTag(&rationalTag)
+			case Undefined:
+				var byteTag ByteTag
+				byteTag.process(ifd.tiffFile, &tag)
+
+				ifd.PutTag(&byteTag)
 			default:
 				fmt.Printf("Unknown tag type %s\n", dataTypeNameMap[dataTypeMap[tag.DataType]])
 			}

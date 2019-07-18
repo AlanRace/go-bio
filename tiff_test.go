@@ -10,7 +10,7 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	filename := "C:\\Work\\PuffPiece\\kidney msi-if-imc_Scan1.qptiff"
+	filename := "X:\\CRUK\\UnifiedWorkflowStudy\\AZ\\OI_from left_136,146.svs"
 
 	tiffFile, err := Open(filename)
 	if err != nil {
@@ -18,34 +18,36 @@ func TestLoad(t *testing.T) {
 	}
 	defer tiffFile.Close()
 
-	ifdIndex := len(tiffFile.IFDList) - 2
+	ifdIndex := 0 //len(tiffFile.IFDList) - 2
 	//ifdIndex = 5
 
 	//fmt.Println(tiffFile)
-	tiffFile.IFDList[ifdIndex].PrintMetadata()
+	//tiffFile.IFDList[ifdIndex].PrintMetadata()
 
 	fmt.Println(tiffFile.IFDList[ifdIndex].GetImageDimensions())
-	fmt.Println(tiffFile.IFDList[ifdIndex].GetResolution())
+	//	fmt.Println(tiffFile.IFDList[ifdIndex].GetResolution())
 
 	dataAccess := tiffFile.IFDList[ifdIndex].dataAccess
 
 	tileAccess, ok := dataAccess.(*TileDataAccess)
 
 	if ok {
-		fmt.Println(tileAccess.GetTileDimensions())
+		/*fmt.Println(tileAccess.GetTileDimensions())
 		fmt.Println(tileAccess.GetTileGrid())
 
 		fmt.Println(tileAccess.GetTileAt(0, 0))
 		fmt.Println(tileAccess.GetTileAt(511, 511))
 		fmt.Println(tileAccess.GetTileAt(512, 512))
-		fmt.Println(tileAccess.GetTileAt(1000, 1000))
+		fmt.Println(tileAccess.GetTileAt(1000, 1000))*/
 
 		//fmt.Println(tiffFile.IFDList[ifdIndex].GetTileAt(tiffFile.IFDList[0].GetImageDimensions()))
 
-		tileData, err := tileAccess.GetTileData(5, 5)
+		tileData, err := tileAccess.GetTileData(0, 0)
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		fmt.Printf("tileData size: %d\n", len(tileData))
 
 		tileWidth, tileLength := tileAccess.GetTileDimensions()
 		img := image.NewGray(image.Rect(0, 0, int(tileWidth), int(tileLength)))
