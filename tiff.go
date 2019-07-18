@@ -25,7 +25,7 @@ type ImageFileHeader struct {
 
 type ImageFileDirectory struct {
 	NumTags       uint16
-	Tags          map[TiffTagID]TiffTag
+	Tags          map[TagID]Tag
 	NextIFDOffset uint32
 
 	tiffFile   *TiffFile
@@ -155,12 +155,12 @@ func (ifd *ImageFileDirectory) setUpDataAccess() error {
 		dataAccess.rowsPerStrip = ifd.GetLongTagValue(RowsPerStrip)
 		dataAccess.stripsInImage = dataAccess.imageLength / dataAccess.rowsPerStrip
 
-		stripOffsetsTag, ok := ifd.Tags[StripOffsets].(*LongTiffTag)
+		stripOffsetsTag, ok := ifd.Tags[StripOffsets].(*LongTag)
 		if !ok {
 			return &FormatError{msg: "Data stored as strips, but StripOffsets appear to be missing"}
 		}
 
-		stripByteCountsTag, ok := ifd.Tags[StripByteCounts].(*LongTiffTag)
+		stripByteCountsTag, ok := ifd.Tags[StripByteCounts].(*LongTag)
 		if !ok {
 			return &FormatError{msg: "Data stored as strips, but StripByteCounts appear to be missing"}
 		}
@@ -184,12 +184,12 @@ func (ifd *ImageFileDirectory) setUpDataAccess() error {
 		dataAccess.tilesAcross = (dataAccess.imageWidth + (dataAccess.tileWidth - 1)) / dataAccess.tileWidth
 		dataAccess.tilesDown = (dataAccess.imageLength + (dataAccess.tileLength - 1)) / dataAccess.tileLength
 
-		tileOffsetsTag, ok := ifd.Tags[TileOffsets].(*LongTiffTag)
+		tileOffsetsTag, ok := ifd.Tags[TileOffsets].(*LongTag)
 		if !ok {
 			return &FormatError{msg: "Data stored as tiles, but TileOffsets appear to be missing"}
 		}
 
-		tileByteCountsTag, ok := ifd.Tags[TileByteCounts].(*LongTiffTag)
+		tileByteCountsTag, ok := ifd.Tags[TileByteCounts].(*LongTag)
 		if !ok {
 			return &FormatError{msg: "Data stored as tiles, but TileByteCounts appear to be missing"}
 		}
@@ -203,9 +203,9 @@ func (ifd *ImageFileDirectory) setUpDataAccess() error {
 	}
 }
 
-func (ifd *ImageFileDirectory) PutTiffTag(tag TiffTag) {
+func (ifd *ImageFileDirectory) PutTag(tag Tag) {
 	if ifd.Tags == nil {
-		ifd.Tags = make(map[TiffTagID]TiffTag)
+		ifd.Tags = make(map[TagID]Tag)
 	}
 
 	ifd.Tags[tag.GetTagID()] = tag
@@ -217,15 +217,15 @@ func (ifd *ImageFileDirectory) PrintMetadata() {
 	}
 }
 
-func (ifd *ImageFileDirectory) GetTag(tagId TiffTagID) TiffTag {
-	return ifd.Tags[tagId]
+func (ifd *ImageFileDirectory) GetTag(tagID TagID) Tag {
+	return ifd.Tags[tagID]
 }
 
-func (ifd *ImageFileDirectory) GetShortTagValue(tagId TiffTagID) uint16 {
-	tag := ifd.Tags[tagId]
+func (ifd *ImageFileDirectory) GetShortTagValue(tagID TagID) uint16 {
+	tag := ifd.Tags[tagID]
 	var value uint16
 
-	shortTag, ok := tag.(*ShortTiffTag)
+	shortTag, ok := tag.(*ShortTag)
 
 	if ok {
 		// TODO: Decide what to do when more than 1 value
@@ -237,17 +237,17 @@ func (ifd *ImageFileDirectory) GetShortTagValue(tagId TiffTagID) uint16 {
 	return value
 }
 
-func (ifd *ImageFileDirectory) GetLongTagValue(tagId TiffTagID) uint32 {
-	tag := ifd.Tags[tagId]
+func (ifd *ImageFileDirectory) GetLongTagValue(tagID TagID) uint32 {
+	tag := ifd.Tags[tagID]
 	var value uint32
 
-	longTag, ok := tag.(*LongTiffTag)
+	longTag, ok := tag.(*LongTag)
 
 	if ok {
 		// TODO: Decide what to do when more than 1 value
 		value = longTag.data[0]
 	} else {
-		shortTag, ok := tag.(*ShortTiffTag)
+		shortTag, ok := tag.(*ShortTag)
 
 		if ok {
 			value = uint32(shortTag.data[0])
@@ -259,10 +259,10 @@ func (ifd *ImageFileDirectory) GetLongTagValue(tagId TiffTagID) uint32 {
 	return value
 }
 
-func (ifd *ImageFileDirectory) GetRationalTagValue(tagId TiffTagID) float64 {
-	tag := ifd.Tags[tagId]
+func (ifd *ImageFileDirectory) GetRationalTagValue(tagID TagID) float64 {
+	tag := ifd.Tags[tagID]
 
-	rationalTag, ok := tag.(*RationalTiffTag)
+	rationalTag, ok := tag.(*RationalTag)
 
 	if !ok {
 		// TODO: Error
@@ -287,9 +287,9 @@ func (ifd *ImageFileDirectory) GetCompression() CompressionID {
 }
 
 func (ifd *ImageFileDirectory) GetResolutionUnit() ResolutionUnitID {
-		resolutionUnitID := ifd.GetShortTagValue(ResolutionUnit)
+	resolutionUnitID := ifd.GetShortTagValue(ResolutionUnit)
 
-		return resolutionUnitTypeMap[resolutionUnitID]
+	return resolutionUnitTypeMap[resolutionUnitID]
 }
 
 func (ifd *ImageFileDirectory) GetPhotometricInterpretation() PhotometricInterpretationID {
@@ -352,7 +352,7 @@ func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) 
 	dataAccess.photometricInterpretation = ifd.GetPhotometricInterpretation()
 	dataAccess.samplesPerPixel = ifd.GetShortTagValue(SamplesPerPixel)
 
-	bitsPerSampleTag, ok := ifd.Tags[BitsPerSample].(*ShortTiffTag)
+	bitsPerSampleTag, ok := ifd.Tags[BitsPerSample].(*ShortTag)
 	if !ok {
 		return &FormatError{msg: "BitsPerSample tag appears to be missin"}
 	}

@@ -29,7 +29,7 @@ var imageTypeMap = map[string]ImageType{
 	"Label":             Label,
 }
 
-type QptiffFile struct {
+type File struct {
 	tiff.TiffFile
 
 	FilterList []string
@@ -40,7 +40,7 @@ type QptiffFile struct {
 	Label     *tiff.ImageFileDirectory
 }
 
-type QptiffImageFileDirectory struct {
+type ImageFileDirectory struct {
 	tiff.ImageFileDirectory
 }
 
@@ -81,8 +81,8 @@ type FormatError struct {
 
 func (e *FormatError) Error() string { return e.msg }
 
-func Open(path string) (*QptiffFile, error) {
-	var qptiffFile QptiffFile
+func Open(path string) (*File, error) {
+	var qptiffFile File
 	tiffFile, err := tiff.Open(path)
 
 	qptiffFile.TiffFile = *tiffFile
@@ -92,7 +92,7 @@ func Open(path string) (*QptiffFile, error) {
 		//firstImage := tiffFile.IFDList[0]
 		// Process image details from first image to determine which type of data, either brightfield or fluorescence
 
-		imageDetailsTag, ok := ifd.Tags[tiff.ImageDescription].(*tiff.ASCIITiffTag)
+		imageDetailsTag, ok := ifd.Tags[tiff.ImageDescription].(*tiff.ASCIITag)
 
 		if !ok {
 			return nil, &FormatError{msg: "ImageDescription is not ASCII type"}

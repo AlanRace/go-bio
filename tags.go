@@ -10,47 +10,57 @@ import (
 	"golang.org/x/image/tiff/lzw"
 )
 
-type TiffTagID uint16
+// TagID captures the ID of common Tiff tags
+type TagID uint16
 
 const (
-	ImageWidth                TiffTagID = 256
-	ImageLength               TiffTagID = 257
-	BitsPerSample             TiffTagID = 258
-	Compression               TiffTagID = 259
-	PhotometricInterpretation TiffTagID = 262
-	Make                      TiffTagID = 271
-	Model                     TiffTagID = 272
-	StripOffsets              TiffTagID = 273
-	SamplesPerPixel           TiffTagID = 277
-	RowsPerStrip              TiffTagID = 278
-	StripByteCounts           TiffTagID = 279
-	XResolution               TiffTagID = 282
-	YResolution               TiffTagID = 283
-	PlanarConfiguration       TiffTagID = 284
-	ResolutionUnit            TiffTagID = 296
-	Software                  TiffTagID = 305
-	DateTime                  TiffTagID = 306
-	YCbCrSubSampling          TiffTagID = 530
-	ReferenceBlackWhite       TiffTagID = 532
-	TileWidth                 TiffTagID = 322
-	TileLength                TiffTagID = 323
-	TileOffsets               TiffTagID = 324
-	TileByteCounts            TiffTagID = 325
-	SampleFormat              TiffTagID = 339
-	SMinSampleValue           TiffTagID = 340
-	SMaxSampleValue           TiffTagID = 341
-	NewSubFileType            TiffTagID = 254
-	ImageDescription          TiffTagID = 270
-	XPosition                 TiffTagID = 286
-	YPosition                 TiffTagID = 287
+	// ImageWidth describes the width of the image in pixels.
+	ImageWidth TagID = 256
+	// ImageLength describes the length (height) of the image in pixels.
+	ImageLength TagID = 257
+	// BitsPerSample describes the number of bits per sample. There can be multiple samples per pixel.
+	BitsPerSample TagID = 258
+	// Compression describes the compression scheme used to store the data.
+	Compression TagID = 259
+	// PhotometricInterpretation describes the way that pixel data is stored.
+	PhotometricInterpretation TagID = 262
+	// Make describes the make of the microscope used to acquire the data.
+	Make TagID = 271
+	// Model describes the model of the microscope used to acquire the data.
+	Model TagID = 272
+	// StripOffsets describes the byte offset of the strips of data. This is only used when the tiff data is stored in strips (not tiles).
+	StripOffsets TagID = 273
+	// SamplesPerPixel describes the number of samples per pixel.
+	SamplesPerPixel     TagID = 277
+	RowsPerStrip        TagID = 278
+	StripByteCounts     TagID = 279
+	XResolution         TagID = 282
+	YResolution         TagID = 283
+	PlanarConfiguration TagID = 284
+	ResolutionUnit      TagID = 296
+	Software            TagID = 305
+	DateTime            TagID = 306
+	YCbCrSubSampling    TagID = 530
+	ReferenceBlackWhite TagID = 532
+	TileWidth           TagID = 322
+	TileLength          TagID = 323
+	TileOffsets         TagID = 324
+	TileByteCounts      TagID = 325
+	SampleFormat        TagID = 339
+	SMinSampleValue     TagID = 340
+	SMaxSampleValue     TagID = 341
+	NewSubFileType      TagID = 254
+	ImageDescription    TagID = 270
+	XPosition           TagID = 286
+	YPosition           TagID = 287
 
 	// Probable NDPI specific
-	XOffsetFromSlideCentre TiffTagID = 65422
-	YOffsetFromSlideCentre TiffTagID = 65423
-	OptimisationEntries    TiffTagID = 65426
+	//XOffsetFromSlideCentre TagID = 65422
+	//YOffsetFromSlideCentre TagID = 65423
+	//OptimisationEntries    TagID = 65426
 )
 
-var tagIdMap = map[uint16]TiffTagID{
+var tagIDMap = map[uint16]TagID{
 	256: ImageWidth,
 	257: ImageLength,
 	258: BitsPerSample,
@@ -83,12 +93,12 @@ var tagIdMap = map[uint16]TiffTagID{
 	287: YPosition,
 
 	// NDPI specific?
-	65422: XOffsetFromSlideCentre,
-	65423: YOffsetFromSlideCentre,
-	65426: OptimisationEntries,
+	//65422: XOffsetFromSlideCentre,
+	//65423: YOffsetFromSlideCentre,
+	//65426: OptimisationEntries,
 }
 
-var tagNameMap = map[TiffTagID]string{
+var tagNameMap = map[TagID]string{
 	ImageWidth:                "ImageWidth",
 	ImageLength:               "ImageLength",
 	BitsPerSample:             "BitsPerSample",
@@ -121,9 +131,9 @@ var tagNameMap = map[TiffTagID]string{
 	YPosition:                 "YPosition",
 
 	// NDPI Specific?
-	XOffsetFromSlideCentre: "XOffsetFromSlideCentre",
-	YOffsetFromSlideCentre: "YOffsetFromSlideCentre",
-	OptimisationEntries:    "OptimisationEntries",
+	//XOffsetFromSlideCentre: "XOffsetFromSlideCentre",
+	//YOffsetFromSlideCentre: "YOffsetFromSlideCentre",
+	//OptimisationEntries:    "OptimisationEntries",
 }
 
 type DataTypeID uint16
@@ -184,6 +194,7 @@ const (
 	JPEG         CompressionID = 6
 )
 
+// Decompress decompresses the data supplied in the io.Reader using the compression method dictated by CompressionID.
 func (compressionID CompressionID) Decompress(r io.Reader) ([]byte, error) {
 	var uncompressedData []byte
 	var err error
@@ -278,40 +289,40 @@ var resolutionUnitTypeMap = map[uint16]ResolutionUnitID{
 	3: Centimeter,
 }
 
-type TiffTag interface {
-	process(tiffFile *TiffFile, tagData *TiffTagData)
+type Tag interface {
+	process(tiffFile *TiffFile, tagData *TagData)
 
-	GetTagID() TiffTagID
+	GetTagID() TagID
 	GetType() DataTypeID
 	String() string
 	GetValueAsString() string
 }
 
-type baseTiffTag struct {
-	TagId TiffTagID
+type baseTag struct {
+	TagID TagID
 	Type  DataTypeID
 }
 
-func (tag *baseTiffTag) processBaseTag(tagData *TiffTagData) {
-	tag.TagId = tagIdMap[tagData.TagId]
+func (tag *baseTag) processBaseTag(tagData *TagData) {
+	tag.TagID = tagIDMap[tagData.TagID]
 	tag.Type = dataTypeMap[tagData.DataType]
 }
 
-func (tag *baseTiffTag) GetTagID() TiffTagID {
-	return tag.TagId
+func (tag *baseTag) GetTagID() TagID {
+	return tag.TagID
 }
 
-func (tag *baseTiffTag) GetType() DataTypeID {
+func (tag *baseTag) GetType() DataTypeID {
 	return tag.Type
 }
 
-type ByteTiffTag struct {
-	baseTiffTag
+type ByteTag struct {
+	baseTag
 
 	data []byte
 }
 
-func (tag *ByteTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
+func (tag *ByteTag) process(tiffFile *TiffFile, tagData *TagData) {
 	tag.processBaseTag(tagData)
 
 	if tagData.DataCount <= 4 {
@@ -331,21 +342,21 @@ func (tag *ByteTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
 	}
 }
 
-func (tag *ByteTiffTag) String() string {
-	return tagNameMap[tag.TagId] + ": " + tag.GetValueAsString()
+func (tag *ByteTag) String() string {
+	return tagNameMap[tag.TagID] + ": " + tag.GetValueAsString()
 }
 
-func (tag *ByteTiffTag) GetValueAsString() string {
+func (tag *ByteTag) GetValueAsString() string {
 	return fmt.Sprint(tag.data)
 }
 
-type ASCIITiffTag struct {
-	baseTiffTag
+type ASCIITag struct {
+	baseTag
 
 	data string
 }
 
-func (tag *ASCIITiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
+func (tag *ASCIITag) process(tiffFile *TiffFile, tagData *TagData) {
 	tag.processBaseTag(tagData)
 	data := make([]byte, tagData.DataCount)
 
@@ -364,21 +375,21 @@ func (tag *ASCIITiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
 	}
 }
 
-func (tag *ASCIITiffTag) String() string {
-	return tagNameMap[tag.TagId] + ": " + tag.GetValueAsString()
+func (tag *ASCIITag) String() string {
+	return tagNameMap[tag.TagID] + ": " + tag.GetValueAsString()
 }
 
-func (tag *ASCIITiffTag) GetValueAsString() string {
+func (tag *ASCIITag) GetValueAsString() string {
 	return tag.data
 }
 
-type ShortTiffTag struct {
-	baseTiffTag
+type ShortTag struct {
+	baseTag
 
 	data []uint16
 }
 
-func (tag *ShortTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
+func (tag *ShortTag) process(tiffFile *TiffFile, tagData *TagData) {
 	tag.processBaseTag(tagData)
 	tag.data = make([]uint16, tagData.DataCount)
 
@@ -398,11 +409,11 @@ func (tag *ShortTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
 	}
 }
 
-func (tag *ShortTiffTag) String() string {
-	return tagNameMap[tag.TagId] + ": " + tag.GetValueAsString()
+func (tag *ShortTag) String() string {
+	return tagNameMap[tag.TagID] + ": " + tag.GetValueAsString()
 }
 
-func (tag *ShortTiffTag) GetValueAsString() string {
+func (tag *ShortTag) GetValueAsString() string {
 	return fmt.Sprint(tag.data)
 }
 
@@ -416,13 +427,13 @@ func (rational *RationalNumber) GetValue() float64 {
 	return float64(rational.Numerator) / float64(rational.Denomiator)
 }
 
-type RationalTiffTag struct {
-	baseTiffTag
+type RationalTag struct {
+	baseTag
 
 	data []RationalNumber
 }
 
-func (tag *RationalTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
+func (tag *RationalTag) process(tiffFile *TiffFile, tagData *TagData) {
 	tag.processBaseTag(tagData)
 	tag.data = make([]RationalNumber, tagData.DataCount)
 
@@ -434,21 +445,21 @@ func (tag *RationalTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
 	tiffFile.file.Seek(startLocation, io.SeekStart)
 }
 
-func (tag *RationalTiffTag) String() string {
-	return tagNameMap[tag.TagId] + ": " + tag.GetValueAsString()
+func (tag *RationalTag) String() string {
+	return tagNameMap[tag.TagID] + ": " + tag.GetValueAsString()
 }
 
-func (tag *RationalTiffTag) GetValueAsString() string {
+func (tag *RationalTag) GetValueAsString() string {
 	return fmt.Sprint(tag.data)
 }
 
-type LongTiffTag struct {
-	baseTiffTag
+type LongTag struct {
+	baseTag
 
 	data []uint32
 }
 
-func (tag *LongTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
+func (tag *LongTag) process(tiffFile *TiffFile, tagData *TagData) {
 	tag.processBaseTag(tagData)
 	tag.data = make([]uint32, tagData.DataCount)
 
@@ -464,16 +475,17 @@ func (tag *LongTiffTag) process(tiffFile *TiffFile, tagData *TiffTagData) {
 	}
 }
 
-func (tag *LongTiffTag) String() string {
-	return tagNameMap[tag.TagId] + ": " + tag.GetValueAsString()
+func (tag *LongTag) String() string {
+	return tagNameMap[tag.TagID] + ": " + tag.GetValueAsString()
 }
 
-func (tag *LongTiffTag) GetValueAsString() string {
+func (tag *LongTag) GetValueAsString() string {
 	return fmt.Sprint(tag.data)
 }
 
-type TiffTagData struct {
-	TagId      uint16 /* The tag identifier  */
+// TagData captures the details of a tag as stored in a tiff file.
+type TagData struct {
+	TagID      uint16 /* The tag identifier  */
 	DataType   uint16 /* The scalar type of the data items  */
 	DataCount  uint32 /* The number of items in the tag data  */
 	DataOffset uint32 /* The byte offset to the data items  */
@@ -481,8 +493,8 @@ type TiffTagData struct {
 
 func (ifd *ImageFileDirectory) processTags() error {
 	var err error
-	var tags []TiffTagData
-	tags = make([]TiffTagData, ifd.NumTags)
+	var tags []TagData
+	tags = make([]TagData, ifd.NumTags)
 
 	err = binary.Read(ifd.tiffFile.file, ifd.tiffFile.header.Endian, &tags)
 	if err != nil {
@@ -490,10 +502,10 @@ func (ifd *ImageFileDirectory) processTags() error {
 	}
 
 	for _, tag := range tags {
-		tagName := tagNameMap[tagIdMap[tag.TagId]]
+		tagName := tagNameMap[tagIDMap[tag.TagID]]
 
 		if tagName == "" {
-			fmt.Printf("Unknown tag id %d\n", tag.TagId)
+			fmt.Printf("Unknown tag id %d\n", tag.TagID)
 		} else {
 			dataType := dataTypeMap[tag.DataType]
 
@@ -501,30 +513,30 @@ func (ifd *ImageFileDirectory) processTags() error {
 
 			switch dataType {
 			case Byte:
-				var byteTag ByteTiffTag
+				var byteTag ByteTag
 				byteTag.process(ifd.tiffFile, &tag)
 
-				ifd.PutTiffTag(&byteTag)
+				ifd.PutTag(&byteTag)
 			case ASCII:
-				var asciiTag ASCIITiffTag
+				var asciiTag ASCIITag
 				asciiTag.process(ifd.tiffFile, &tag)
 
-				ifd.PutTiffTag(&asciiTag)
+				ifd.PutTag(&asciiTag)
 			case Short:
-				var shortTag ShortTiffTag
+				var shortTag ShortTag
 				shortTag.process(ifd.tiffFile, &tag)
 
-				ifd.PutTiffTag(&shortTag)
+				ifd.PutTag(&shortTag)
 			case Long:
-				var longTag LongTiffTag
+				var longTag LongTag
 				longTag.process(ifd.tiffFile, &tag)
 
-				ifd.PutTiffTag(&longTag)
+				ifd.PutTag(&longTag)
 			case Rational:
-				var rationalTag RationalTiffTag
+				var rationalTag RationalTag
 				rationalTag.process(ifd.tiffFile, &tag)
 
-				ifd.PutTiffTag(&rationalTag)
+				ifd.PutTag(&rationalTag)
 			default:
 				fmt.Printf("Unknown tag type %s\n", dataTypeNameMap[dataTypeMap[tag.DataType]])
 			}
