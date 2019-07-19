@@ -33,7 +33,7 @@ func TestLoad(t *testing.T) {
 
 	data, err := section.GetRGBAData()
 
-	img := image.NewRGBA(image.Rect(0, 0, int(section.sectionWidth), int(section.sectionHeight)))
+	img := image.NewRGBA(image.Rect(0, 0, int(section.Width), int(section.Height)))
 	img.Pix = data
 
 	f, err := os.Create("section.png")

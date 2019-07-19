@@ -540,16 +540,16 @@ func (dataAccess *StripDataAccess) GetSection(index uint32) *Section {
 
 	var section Section
 	section.dataAccess = dataAccess
-	section.sectionX = 0
-	section.sectionY = index
-	section.sectionIndex = index
+	section.X = 0
+	section.Y = index
+	section.Index = index
 
-	section.sectionWidth = dataAccess.imageWidth
+	section.Width = dataAccess.imageWidth
 
-	if section.sectionY == dataAccess.stripsInImage-1 {
-		section.sectionHeight = dataAccess.imageLength % dataAccess.rowsPerStrip
+	if section.Y == dataAccess.stripsInImage-1 {
+		section.Height = dataAccess.imageLength % dataAccess.rowsPerStrip
 	} else {
-		section.sectionHeight = dataAccess.rowsPerStrip
+		section.Height = dataAccess.rowsPerStrip
 	}
 
 	return &section
@@ -619,13 +619,13 @@ type TileDataAccess struct {
 type Section struct {
 	dataAccess DataAccess
 
-	sectionWidth  uint32
-	sectionHeight uint32
+	Width  uint32
+	Height uint32
 
-	sectionX uint32
-	sectionY uint32
+	X uint32
+	Y uint32
 
-	sectionIndex uint32
+	Index uint32
 }
 
 func (dataAccess *TileDataAccess) GetTileDimensions() (uint32, uint32) {
@@ -657,21 +657,21 @@ func (dataAccess *TileDataAccess) GetSectionAt(x uint32, y uint32) *Section {
 func (dataAccess *TileDataAccess) GetSection(index uint32) *Section {
 	var section Section
 	section.dataAccess = dataAccess
-	section.sectionX = index % dataAccess.tilesAcross
-	section.sectionY = index / dataAccess.tilesAcross
+	section.X = index % dataAccess.tilesAcross
+	section.Y = index / dataAccess.tilesAcross
 
-	section.sectionIndex = index
+	section.Index = index
 
-	if section.sectionX == dataAccess.tilesAcross-1 {
-		section.sectionWidth = dataAccess.imageWidth % dataAccess.tileWidth
+	if section.X == dataAccess.tilesAcross-1 {
+		section.Width = dataAccess.imageWidth % dataAccess.tileWidth
 	} else {
-		section.sectionWidth = dataAccess.tileWidth
+		section.Width = dataAccess.tileWidth
 	}
 
-	if section.sectionY == dataAccess.tilesDown-1 {
-		section.sectionHeight = dataAccess.imageLength % dataAccess.tileLength
+	if section.Y == dataAccess.tilesDown-1 {
+		section.Height = dataAccess.imageLength % dataAccess.tileLength
 	} else {
-		section.sectionHeight = dataAccess.tileLength
+		section.Height = dataAccess.tileLength
 	}
 
 	return &section
@@ -727,7 +727,7 @@ func (dataAccess *TileDataAccess) GetImage() (image.Image, error) {
 }
 
 func (section *Section) GetData() ([]byte, error) {
-	return section.dataAccess.GetData(section.sectionIndex)
+	return section.dataAccess.GetData(section.Index)
 }
 
 func (section *Section) GetRGBData() ([]byte, error) {
