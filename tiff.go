@@ -308,8 +308,16 @@ func (ifd *ImageFileDirectory) GetPhotometricInterpretation() PhotometricInterpr
 	return photometricInterpretationTypeMap[photometricInterpretationID]
 }
 
-func (ifd *ImageFileDirectory) GetDataIndexAt(x uint32, y uint32) uint32 {
+/*func (ifd *ImageFileDirectory) GetDataIndexAt(x uint32, y uint32) uint32 {
 	return ifd.dataAccess.GetDataIndexAt(x, y)
+}*/
+
+func (ifd *ImageFileDirectory) GetSectionAt(x, y uint32) *Section {
+	return ifd.dataAccess.GetSectionAt(x, y)
+}
+
+func (ifd *ImageFileDirectory) GetSectionDimensions() (uint32, uint32) {
+	return ifd.dataAccess.GetSectionDimensions()
 }
 
 func (ifd *ImageFileDirectory) GetCompressedData(index uint32) ([]byte, error) {
@@ -332,19 +340,25 @@ func (ifd *ImageFileDirectory) IsTiled() bool {
 	return ifd.GetTag(TileWidth) != nil
 }
 
-func (ifd *ImageFileDirectory) GetDataAccess() DataAccess {
+/*func (ifd *ImageFileDirectory) GetDataAccess() DataAccess {
 	return ifd.dataAccess
-}
+}*/
 
 type DataAccess interface {
 	// Requests data at a specific location, returns data (which could be larger than the requested region depending on tiling/slicing)
 	//GetData(rect image.Rectangle) ([]byte, image.Rectangle)
 
-	GetDataIndexAt(x uint32, y uint32) uint32
+	// TODO: Reasses whether these are necessary with the new Section API
+	//GetDataIndexAt(x uint32, y uint32) uint32
 	GetCompressedData(index uint32) ([]byte, error)
 	GetData(index uint32) ([]byte, error)
 	GetFullData() ([]byte, error)
 	GetImage() (image.Image, error)
+
+	GetPhotometricInterpretation() PhotometricInterpretationID
+
+	GetSectionAt(x, y uint32) *Section
+	GetSectionDimensions() (uint32, uint32)
 }
 
 type baseDataAccess struct {
@@ -407,6 +421,10 @@ func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) 
 	}
 
 	return nil
+}
+
+func (dataAccess *baseDataAccess) GetPhotometricInterpretation() PhotometricInterpretationID {
+	return dataAccess.photometricInterpretation
 }
 
 func (dataAccess *baseDataAccess) GetImageDimensions() (uint32, uint32) {
@@ -485,12 +503,38 @@ type StripDataAccess struct {
 	stripsInImage uint32
 }
 
+func (dataAccess *StripDataAccess) GetSectionDimensions() (uint32, uint32) {
+	return dataAccess.GetStripDimensions()
+}
+
 func (dataAccess *StripDataAccess) GetStripDimensions() (uint32, uint32) {
 	return dataAccess.imageWidth, dataAccess.rowsPerStrip
 }
 
-func (dataAccess *StripDataAccess) GetDataIndexAt(x uint32, y uint32) uint32 {
+/*func (dataAccess *StripDataAccess) GetDataIndexAt(x uint32, y uint32) uint32 {
 	return y / dataAccess.rowsPerStrip
+}*/
+
+func (dataAccess *StripDataAccess) GetSectionAt(x uint32, y uint32) *Section {
+	return dataAccess.GetStripAt(x, y)
+}
+
+func (dataAccess *StripDataAccess) GetStripAt(x uint32, y uint32) *Section {
+	var section Section
+	section.dataAccess = dataAccess
+	section.sectionX = 0
+	section.sectionY = y / dataAccess.rowsPerStrip
+	section.sectionIndex = section.sectionY
+
+	section.sectionWidth = dataAccess.imageWidth
+
+	if section.sectionY == dataAccess.stripsInImage-1 {
+		section.sectionHeight = dataAccess.imageLength % dataAccess.rowsPerStrip
+	} else {
+		section.sectionHeight = dataAccess.rowsPerStrip
+	}
+
+	return &section
 }
 
 func (dataAccess *StripDataAccess) GetStripInBytes() uint32 {
@@ -552,16 +596,43 @@ func (dataAccess *TileDataAccess) GetTileDimensions() (uint32, uint32) {
 	return dataAccess.tileWidth, dataAccess.tileLength
 }
 
+func (dataAccess *TileDataAccess) GetSectionDimensions() (uint32, uint32) {
+	return dataAccess.GetTileDimensions()
+}
+
 func (dataAccess *TileDataAccess) GetTileGrid() (uint32, uint32) {
 	return dataAccess.tilesAcross, dataAccess.tilesDown
 }
 
-func (dataAccess *TileDataAccess) GetDataIndexAt(x uint32, y uint32) uint32 {
+/*func (dataAccess *TileDataAccess) GetDataIndexAt(x uint32, y uint32) uint32 {
 	return y*dataAccess.tilesAcross + x
+}*/
+
+func (dataAccess *TileDataAccess) GetSectionAt(x uint32, y uint32) *Section {
+	return dataAccess.GetTileAt(x, y)
 }
 
-func (dataAccess *TileDataAccess) GetTileAt(x uint32, y uint32) (uint32, uint32) {
-	return x / dataAccess.tileWidth, y / dataAccess.tileLength
+func (dataAccess *TileDataAccess) GetTileAt(x uint32, y uint32) *Section {
+	var section Section
+	section.dataAccess = dataAccess
+	section.sectionX = x / dataAccess.tileWidth
+	section.sectionY = y / dataAccess.tileLength
+
+	section.sectionIndex = section.sectionY*dataAccess.tilesAcross + section.sectionX
+
+	if section.sectionX == dataAccess.tilesAcross-1 {
+		section.sectionWidth = dataAccess.imageWidth % dataAccess.tileWidth
+	} else {
+		section.sectionWidth = dataAccess.tileWidth
+	}
+
+	if section.sectionY == dataAccess.tilesDown-1 {
+		section.sectionHeight = dataAccess.imageLength % dataAccess.tileLength
+	} else {
+		section.sectionHeight = dataAccess.tileLength
+	}
+
+	return &section
 }
 
 /*func (dataAccess *TileDataAccess) GetUncompressedTileData(x uint32, y uint32) ([]byte, error) {
@@ -588,4 +659,45 @@ func (dataAccess *TileDataAccess) GetImage() (image.Image, error) {
 	}
 
 	return dataAccess.createImage(fullData)
+}
+
+func (section *Section) GetData() ([]byte, error) {
+	return section.dataAccess.GetData(section.sectionIndex)
+}
+
+func (section *Section) GetRGBData() ([]byte, error) {
+	rawData, err := section.GetData()
+
+	if err != nil {
+		return nil, err
+	}
+
+	switch section.dataAccess.GetPhotometricInterpretation() {
+	case RGB:
+		// TODO: check if the data is interlieved
+
+		return rawData, nil
+	default:
+		return nil, &FormatError{msg: "Unsupported PhotometricInterpretation: " + photometricInterpretationNameMap[section.dataAccess.GetPhotometricInterpretation()]}
+	}
+}
+
+func (section *Section) GetRGBAData() ([]byte, error) {
+	rawData, err := section.GetRGBData()
+
+	if err != nil {
+		return nil, err
+	}
+
+	var rgba []byte
+	rgba = make([]byte, (len(rawData)/3)*4)
+
+	for i := 0; i < (len(rawData) / 3); i++ {
+		rgba[i*4] = rawData[i*3]
+		rgba[i*4+1] = rawData[i*3+1]
+		rgba[i*4+2] = rawData[i*3+2]
+		rgba[i*4+3] = 255
+	}
+
+	return rgba, nil
 }

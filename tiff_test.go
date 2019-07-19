@@ -27,20 +27,39 @@ func TestLoad(t *testing.T) {
 	fmt.Println(tiffFile.IFDList[ifdIndex].GetImageDimensions())
 	//	fmt.Println(tiffFile.IFDList[ifdIndex].GetResolution())
 
-	dataAccess := tiffFile.IFDList[ifdIndex].dataAccess
+	ifd := tiffFile.IFDList[ifdIndex]
+
+	section := ifd.GetSectionAt(0, 0)
+
+	data, err := section.GetRGBAData()
+
+	img := image.NewRGBA(image.Rect(0, 0, int(section.sectionWidth), int(section.sectionHeight)))
+	img.Pix = data
+
+	f, err := os.Create("section.png")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	png.Encode(f, img)
+
+	/*dataAccess := tiffFile.IFDList[ifdIndex].dataAccess
 
 	tileAccess, ok := dataAccess.(*TileDataAccess)
 
 	if ok {
-		/*fmt.Println(tileAccess.GetTileDimensions())
+		fmt.Println(tileAccess.GetTileDimensions())
 		fmt.Println(tileAccess.GetTileGrid())
 
 		fmt.Println(tileAccess.GetTileAt(0, 0))
 		fmt.Println(tileAccess.GetTileAt(511, 511))
 		fmt.Println(tileAccess.GetTileAt(512, 512))
-		fmt.Println(tileAccess.GetTileAt(1000, 1000))*/
+		fmt.Println(tileAccess.GetTileAt(1000, 1000))
+		fmt.Println(tileAccess.GetTileAt(48560, 33406))
 
 		//fmt.Println(tiffFile.IFDList[ifdIndex].GetTileAt(tiffFile.IFDList[0].GetImageDimensions()))
+
+		tile := tileAccess.GetSectionAt(0, 0)
 
 		tileData, err := tileAccess.GetTileData(0, 0)
 		if err != nil {
@@ -80,7 +99,7 @@ func TestLoad(t *testing.T) {
 
 		fmt.Println(len(stripData))
 
-		/*fullData, err := stripAccess.GetFullData()
+		fullData, err := stripAccess.GetFullData()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -99,7 +118,7 @@ func TestLoad(t *testing.T) {
 		//stripWidth, stripLength := stripAccess.GetStripDimensions()
 		width, length := stripAccess.GetImageDimensions()
 		img := image.NewRGBA(image.Rect(0, 0, int(width), int(length)))
-		img.Pix = data*/
+		img.Pix = data
 
 		img, err := stripAccess.GetImage()
 		if err != nil {
@@ -113,4 +132,5 @@ func TestLoad(t *testing.T) {
 		defer f.Close()
 		png.Encode(f, img)
 	}
+	*/
 }
