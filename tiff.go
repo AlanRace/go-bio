@@ -320,6 +320,10 @@ func (ifd *ImageFileDirectory) GetSectionDimensions() (uint32, uint32) {
 	return ifd.dataAccess.GetSectionDimensions()
 }
 
+func (ifd *ImageFileDirectory) GetSectionGrid() (uint32, uint32) {
+	return ifd.dataAccess.GetSectionGrid()
+}
+
 func (ifd *ImageFileDirectory) GetCompressedData(index uint32) ([]byte, error) {
 	return ifd.dataAccess.GetCompressedData(index)
 }
@@ -359,6 +363,7 @@ type DataAccess interface {
 
 	GetSectionAt(x, y uint32) *Section
 	GetSectionDimensions() (uint32, uint32)
+	GetSectionGrid() (uint32, uint32)
 }
 
 type baseDataAccess struct {
@@ -503,6 +508,10 @@ type StripDataAccess struct {
 	stripsInImage uint32
 }
 
+func (dataAccess *StripDataAccess) GetSectionGrid() (uint32, uint32) {
+	return 1, dataAccess.stripsInImage
+}
+
 func (dataAccess *StripDataAccess) GetSectionDimensions() (uint32, uint32) {
 	return dataAccess.GetStripDimensions()
 }
@@ -594,6 +603,10 @@ type Section struct {
 
 func (dataAccess *TileDataAccess) GetTileDimensions() (uint32, uint32) {
 	return dataAccess.tileWidth, dataAccess.tileLength
+}
+
+func (dataAccess *TileDataAccess) GetSectionGrid() (uint32, uint32) {
+	return dataAccess.tilesAcross, dataAccess.tilesDown
 }
 
 func (dataAccess *TileDataAccess) GetSectionDimensions() (uint32, uint32) {
