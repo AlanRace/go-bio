@@ -3,11 +3,12 @@ package tiff
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"image"
 	"io"
 	"os"
+
+	"gitea.alanrace.com/alan/go-tiff/jpeg"
 )
 
 const (
@@ -353,8 +354,10 @@ type baseDataAccess struct {
 	imageWidth  uint32
 	imageLength uint32
 
-	compression               CompressionID
+	compressionID             CompressionID
 	photometricInterpretation PhotometricInterpretationID
+
+	compression CompressionMethod
 
 	bitsPerSample   []uint16
 	samplesPerPixel uint16
@@ -367,7 +370,7 @@ func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) 
 	dataAccess.tiffFile = ifd.tiffFile
 	dataAccess.ifd = ifd
 	dataAccess.imageWidth, dataAccess.imageLength = ifd.GetImageDimensions()
-	dataAccess.compression = ifd.GetCompression()
+	dataAccess.compressionID = ifd.GetCompression()
 	dataAccess.photometricInterpretation = ifd.GetPhotometricInterpretation()
 	dataAccess.samplesPerPixel = ifd.GetShortTagValue(SamplesPerPixel)
 
@@ -377,6 +380,31 @@ func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) 
 	}
 
 	dataAccess.bitsPerSample = bitsPerSampleTag.data
+
+	switch dataAccess.compressionID {
+	case LZW:
+		dataAccess.compression = &LZWCompression{}
+	case JPEG:
+		if dataAccess.ifd.GetTag(JPEGTables) != nil {
+			tablesTag, ok := dataAccess.ifd.GetTag(JPEGTables).(*ByteTag)
+			if !ok {
+				return &FormatError{msg: "JPEGTables not recorded as byte"}
+			}
+
+			r := bytes.NewReader(tablesTag.data)
+
+			header, err := jpeg.DecodeHeader(r)
+			if err != nil {
+				return err
+			}
+
+			dataAccess.compression = &JPEGCompression{header: header}
+		} else {
+			return &FormatError{msg: "No JPEGTables tag, unsupported form of JPEG compression"}
+		}
+	default:
+		return &FormatError{msg: "Unsupported compression scheme " + dataAccess.compressionID.String()}
+	}
 
 	return nil
 }
@@ -405,53 +433,7 @@ func (dataAccess *baseDataAccess) GetData(index uint32) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if dataAccess.ifd.GetTag(JPEGTables) != nil {
-		tablesTag, ok := dataAccess.ifd.GetTag(JPEGTables).(*ByteTag)
-		if !ok {
-			return nil, &FormatError{msg: "JPEGTables not recorded as byte"}
-		}
-		fmt.Println(hex.EncodeToString(byteData[2:]))
-		fmt.Println(hex.EncodeToString(tablesTag.data[:len(tablesTag.data)-2]))
-		//fmt.Println(hex.EncodeToString(append(tablesTag.data[:len(tablesTag.data)-2], byteData[2:]...)))
-
-		f1, err := os.Create("header.bin")
-		if err != nil {
-			return nil, err
-		}
-		defer f1.Close()
-
-		_, err = f1.Write(tablesTag.data)
-		if err != nil {
-			return nil, err
-		}
-
-		f2, err := os.Create("body.bin")
-		if err != nil {
-			return nil, err
-		}
-		defer f2.Close()
-
-		_, err = f2.Write(byteData)
-		if err != nil {
-			return nil, err
-		}
-
-		f, err := os.Create("testnodecode.jpg")
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-
-		_, err = f.Write(append(tablesTag.data[:len(tablesTag.data)-2], byteData[2:]...))
-		if err != nil {
-			return nil, err
-		}
-
-		r = bytes.NewReader(append(tablesTag.data[:len(tablesTag.data)-2], byteData[2:]...))
-
-	} else {
-		r = bytes.NewReader(byteData)
-	}
+	r = bytes.NewReader(byteData)
 
 	return dataAccess.compression.Decompress(r)
 }
@@ -551,6 +533,19 @@ type TileDataAccess struct {
 
 	tilesAcross uint32
 	tilesDown   uint32
+}
+
+// Section describes a single part of an image. When the tiff file is split into strips this is one strip. When the data is split into tiles this is one tile.
+type Section struct {
+	dataAccess DataAccess
+
+	sectionWidth  uint32
+	sectionHeight uint32
+
+	sectionX uint32
+	sectionY uint32
+
+	sectionIndex uint32
 }
 
 func (dataAccess *TileDataAccess) GetTileDimensions() (uint32, uint32) {

@@ -6,6 +6,80 @@ import "io"
 // Huffman data.
 var errShortHuffmanData = FormatError("short Huffman data")
 
+// LUT generation taken from https://golang.google.cn/src/image/jpeg/huffman.go
+
+// maxCodeLength is the maximum (inclusive) number of bits in a Huffman code.
+const maxCodeLength = 16
+
+// maxNCodes is the maximum (inclusive) number of codes in a Huffman tree.
+const maxNCodes = 256
+
+// lutSize is the log-2 size of the Huffman decoder's look-up table.
+const lutSize = 8
+
+type HuffmanTable struct {
+	NumberOfSymbols [16]uint8
+	Symbols         []uint8
+
+	// length is the number of codes in the tree.
+	nCodes uint8
+	// lut is the look-up table for the next lutSize bits in the bit-stream.
+	// The high 8 bits of the uint16 are the encoded value. The low 8 bits
+	// are 1 plus the code length, or 0 if the value is too large to fit in
+	// lutSize bits.
+	lut [1 << lutSize]uint16
+	// minCodes[i] is the minimum code of length i, or -1 if there are no
+	// codes of that length.
+	minCodes [maxCodeLength]int32
+	// maxCodes[i] is the maximum code of length i, or -1 if there are no
+	// codes of that length.
+	maxCodes [maxCodeLength]int32
+	// valsIndices[i] is the index into vals of minCodes[i].
+	valsIndices [maxCodeLength]int32
+}
+
+func (ht *HuffmanTable) generateLUT() {
+	// Derive the look-up table.
+	for i := range ht.lut {
+		ht.lut[i] = 0
+	}
+	var x, code uint32
+	for i := uint32(0); i < lutSize; i++ {
+		code <<= 1
+		for j := uint8(0); j < ht.NumberOfSymbols[i]; j++ {
+			// The codeLength is 1+i, so shift code by 8-(1+i) to
+			// calculate the high bits for every 8-bit sequence
+			// whose codeLength's high bits matches code.
+			// The high 8 bits of lutValue are the encoded value.
+			// The low 8 bits are 1 plus the codeLength.
+			base := uint8(code << (7 - i))
+			lutValue := uint16(ht.Symbols[x])<<8 | uint16(2+i)
+			for k := uint8(0); k < 1<<(7-i); k++ {
+				ht.lut[base|k] = lutValue
+			}
+			code++
+			x++
+		}
+	}
+
+	// Derive minCodes, maxCodes, and valsIndices.
+	var c, index int32
+	for i, n := range ht.NumberOfSymbols {
+		if n == 0 {
+			ht.minCodes[i] = -1
+			ht.maxCodes[i] = -1
+			ht.valsIndices[i] = -1
+		} else {
+			ht.minCodes[i] = c
+			ht.maxCodes[i] = c + int32(n) - 1
+			ht.valsIndices[i] = index
+			c += int32(n)
+			index += int32(n)
+		}
+		c <<= 1
+	}
+}
+
 // decodeHuffman returns the next Huffman-coded value from the bit-stream,
 // decoded according to h.
 func (d *decoder) decodeHuffman(h *HuffmanTable) (uint8, error) {

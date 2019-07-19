@@ -47,11 +47,18 @@ func TestLoad(t *testing.T) {
 			log.Fatal(err)
 		}
 
+		var newData []uint8
+		newData = make([]uint8, len(tileData)/3)
+
+		for i := 0; i < len(newData); i++ {
+			newData[i] = tileData[i*3]
+		}
+
 		fmt.Printf("tileData size: %d\n", len(tileData))
 
 		tileWidth, tileLength := tileAccess.GetTileDimensions()
 		img := image.NewGray(image.Rect(0, 0, int(tileWidth), int(tileLength)))
-		img.Pix = tileData
+		img.Pix = newData
 
 		f, err := os.Create("tile.png")
 		if err != nil {

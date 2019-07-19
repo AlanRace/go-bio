@@ -18,12 +18,12 @@ func TestLoad(t *testing.T) {
 
 	reader := bufio.NewReader(f)
 
-	header, err := decodeHeader(reader)
+	header, err := DecodeHeader(reader)
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	fmt.Println("-----")
+	//fmt.Println("-----")
 
 	filename = "body.bin"
 
@@ -35,8 +35,19 @@ func TestLoad(t *testing.T) {
 
 	reader = bufio.NewReader(f1)
 
-	err = decodeBody(reader, header)
+	data, err := header.DecodeBody(reader)
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	//fmt.Println(data)
+
+	f2, err := os.Create("dmp.bin")
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer f2.Close()
+
+	f2.Write(data.Data)
+
 }

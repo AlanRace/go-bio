@@ -3,15 +3,9 @@ package tiff
 import (
 	"encoding/binary"
 	"fmt"
-	"image/jpeg"
-	"image/png"
 	"io"
-	"io/ioutil"
 	"log"
-	"os"
 	"strconv"
-
-	"golang.org/x/image/tiff/lzw"
 )
 
 // TagID captures the ID of common Tiff tags
@@ -204,36 +198,6 @@ const (
 	OJPEG        CompressionID = 6
 	JPEG         CompressionID = 7
 )
-
-// Decompress decompresses the data supplied in the io.Reader using the compression method dictated by CompressionID.
-func (compressionID CompressionID) Decompress(r io.Reader) ([]byte, error) {
-	var uncompressedData []byte
-	var err error
-
-	switch compressionID {
-	case LZW:
-		readCloser := lzw.NewReader(r, lzw.MSB, 8)
-		uncompressedData, err = ioutil.ReadAll(readCloser)
-		readCloser.Close()
-	case JPEG:
-		img, err := jpeg.Decode(r)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(img.At(0, 0).RGBA())
-		f, err := os.Create("TESTDECODE.png")
-		if err != nil {
-			panic(err)
-		}
-		defer f.Close()
-		png.Encode(f, img)
-		//uncompressedData = img.Pix
-	default:
-		return nil, &FormatError{msg: "Unsupported compression scheme: " + compressionID.String()}
-	}
-
-	return uncompressedData, err
-}
 
 func (compressionID CompressionID) String() string {
 	return compressionNameMap[compressionID] + " (" + strconv.Itoa(int(compressionID)) + ")"
