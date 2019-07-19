@@ -312,6 +312,10 @@ func (ifd *ImageFileDirectory) GetPhotometricInterpretation() PhotometricInterpr
 	return ifd.dataAccess.GetDataIndexAt(x, y)
 }*/
 
+func (ifd *ImageFileDirectory) GetSection(index uint32) *Section {
+	return ifd.dataAccess.GetSection(index)
+}
+
 func (ifd *ImageFileDirectory) GetSectionAt(x, y uint32) *Section {
 	return ifd.dataAccess.GetSectionAt(x, y)
 }
@@ -361,6 +365,7 @@ type DataAccess interface {
 
 	GetPhotometricInterpretation() PhotometricInterpretationID
 
+	GetSection(index uint32) *Section
 	GetSectionAt(x, y uint32) *Section
 	GetSectionDimensions() (uint32, uint32)
 	GetSectionGrid() (uint32, uint32)
@@ -525,10 +530,32 @@ func (dataAccess *StripDataAccess) GetStripDimensions() (uint32, uint32) {
 }*/
 
 func (dataAccess *StripDataAccess) GetSectionAt(x uint32, y uint32) *Section {
-	return dataAccess.GetStripAt(x, y)
+	return dataAccess.GetSection(y / dataAccess.rowsPerStrip)
 }
 
-func (dataAccess *StripDataAccess) GetStripAt(x uint32, y uint32) *Section {
+func (dataAccess *StripDataAccess) GetSection(index uint32) *Section {
+	if index > dataAccess.stripsInImage {
+		return nil
+	}
+
+	var section Section
+	section.dataAccess = dataAccess
+	section.sectionX = 0
+	section.sectionY = index
+	section.sectionIndex = index
+
+	section.sectionWidth = dataAccess.imageWidth
+
+	if section.sectionY == dataAccess.stripsInImage-1 {
+		section.sectionHeight = dataAccess.imageLength % dataAccess.rowsPerStrip
+	} else {
+		section.sectionHeight = dataAccess.rowsPerStrip
+	}
+
+	return &section
+}
+
+/*func (dataAccess *StripDataAccess) GetStripAt(x uint32, y uint32) *Section {
 	var section Section
 	section.dataAccess = dataAccess
 	section.sectionX = 0
@@ -544,7 +571,7 @@ func (dataAccess *StripDataAccess) GetStripAt(x uint32, y uint32) *Section {
 	}
 
 	return &section
-}
+}*/
 
 func (dataAccess *StripDataAccess) GetStripInBytes() uint32 {
 	return dataAccess.imageWidth * dataAccess.rowsPerStrip * dataAccess.PixelSizeInBytes()
@@ -622,10 +649,35 @@ func (dataAccess *TileDataAccess) GetTileGrid() (uint32, uint32) {
 }*/
 
 func (dataAccess *TileDataAccess) GetSectionAt(x uint32, y uint32) *Section {
-	return dataAccess.GetTileAt(x, y)
+	index := (y/dataAccess.tileLength)*dataAccess.tilesAcross + (x / dataAccess.tileWidth)
+
+	return dataAccess.GetSection(index)
 }
 
-func (dataAccess *TileDataAccess) GetTileAt(x uint32, y uint32) *Section {
+func (dataAccess *TileDataAccess) GetSection(index uint32) *Section {
+	var section Section
+	section.dataAccess = dataAccess
+	section.sectionX = index % dataAccess.tilesAcross
+	section.sectionY = index / dataAccess.tilesAcross
+
+	section.sectionIndex = index
+
+	if section.sectionX == dataAccess.tilesAcross-1 {
+		section.sectionWidth = dataAccess.imageWidth % dataAccess.tileWidth
+	} else {
+		section.sectionWidth = dataAccess.tileWidth
+	}
+
+	if section.sectionY == dataAccess.tilesDown-1 {
+		section.sectionHeight = dataAccess.imageLength % dataAccess.tileLength
+	} else {
+		section.sectionHeight = dataAccess.tileLength
+	}
+
+	return &section
+}
+
+/*func (dataAccess *TileDataAccess) GetTileAt(x uint32, y uint32) *Section {
 	var section Section
 	section.dataAccess = dataAccess
 	section.sectionX = x / dataAccess.tileWidth
@@ -646,7 +698,7 @@ func (dataAccess *TileDataAccess) GetTileAt(x uint32, y uint32) *Section {
 	}
 
 	return &section
-}
+}*/
 
 /*func (dataAccess *TileDataAccess) GetUncompressedTileData(x uint32, y uint32) ([]byte, error) {
 	tileIndex := y*dataAccess.tilesAcross + x
