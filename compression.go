@@ -5,7 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 
-	"gitea.alanrace.com/alan/go-tiff/jpeg"
+	"github.com/AlanRace/go-bio/jpeg"
 )
 
 type CompressionMethod interface {

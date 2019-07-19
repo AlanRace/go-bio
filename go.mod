@@ -1,4 +1,4 @@
-module gitea.alanrace.com/alan/go-tiff
+module github.com/AlanRace/go-bio
 
 go 1.12
 

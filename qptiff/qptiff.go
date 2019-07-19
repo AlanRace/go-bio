@@ -4,7 +4,7 @@ import (
 	"encoding/xml"
 	"strings"
 
-	"gitea.alanrace.com/alan/go-tiff"
+	tiff "github.com/AlanRace/go-bio"
 )
 
 type ImageType int

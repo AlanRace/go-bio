@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"gitea.alanrace.com/alan/go-tiff"
+	tiff "github.com/AlanRace/go-bio"
 )
 
 func main() {
