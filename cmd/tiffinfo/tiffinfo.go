@@ -30,8 +30,11 @@ func main() {
 			fmt.Printf("PhotometricInterpretation: %s\n", ifd.GetPhotometricInterpretation().String())
 			fmt.Printf("%s\n", ifd.GetTag(tiff.PlanarConfiguration))
 			fmt.Printf("Compression: %s\n", ifd.GetCompression().String())
+			x, y, _ := ifd.GetResolution()
 
-			if ifd.IsTiled() {
+			fmt.Printf("Resolution (%d): %f x %f\n", ifd.GetResolutionUnit(), x, y)
+
+			/*if ifd.IsTiled() {
 				dataAccess, ok := ifd.GetDataAccess().(*tiff.TileDataAccess)
 				if !ok {
 					fmt.Println("ERROR: Should be tiled, but isn't")
@@ -39,7 +42,7 @@ func main() {
 
 				tileWidth, tileHeight := dataAccess.GetTileDimensions()
 				fmt.Printf("Tiles: %d x %d\n", tileWidth, tileHeight)
-			}
+			}*/
 
 			fmt.Printf("%s\n", ifd.GetTag(tiff.ImageDescription))
 			fmt.Println()

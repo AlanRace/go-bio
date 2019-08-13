@@ -203,26 +203,6 @@ func (compressionID CompressionID) String() string {
 	return compressionNameMap[compressionID] + " (" + strconv.Itoa(int(compressionID)) + ")"
 }
 
-var compressionNameMap = map[CompressionID]string{
-	Uncompressed: "Uncompressed",
-	CCIT1D:       "CCIT1D",
-	CCITGroup3:   "CCITGroup3",
-	CCITGroup4:   "CCITGroup4",
-	LZW:          "LZW",
-	OJPEG:        "OJPEG",
-	JPEG:         "JPEG",
-}
-
-var compressionTypeMap = map[uint16]CompressionID{
-	1: Uncompressed,
-	2: CCIT1D,
-	3: CCITGroup3,
-	4: CCITGroup4,
-	5: LZW,
-	6: OJPEG,
-	7: JPEG,
-}
-
 type PhotometricInterpretationID uint16
 
 const (

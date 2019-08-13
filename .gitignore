@@ -1,2 +1,12 @@
 
 \.idea/
+
+*.png
+
+*.j2k
+
+*.exe
+
+*.bin
+
+*.out

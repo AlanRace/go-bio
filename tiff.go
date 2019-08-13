@@ -7,8 +7,6 @@ import (
 	"image"
 	"io"
 	"os"
-
-	"github.com/AlanRace/go-bio/jpeg"
 )
 
 const (
@@ -352,6 +350,10 @@ func (ifd *ImageFileDirectory) IsTiled() bool {
 	return ifd.dataAccess
 }*/
 
+type TagAccess interface {
+	GetTag(tagID TagID) Tag
+}
+
 type DataAccess interface {
 	// Requests data at a specific location, returns data (which could be larger than the requested region depending on tiling/slicing)
 	//GetData(rect image.Rectangle) ([]byte, image.Rectangle)
@@ -391,6 +393,8 @@ type baseDataAccess struct {
 }
 
 func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) error {
+	var err error
+
 	dataAccess.tiffFile = ifd.tiffFile
 	dataAccess.ifd = ifd
 	dataAccess.imageWidth, dataAccess.imageLength = ifd.GetImageDimensions()
@@ -405,32 +409,25 @@ func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) 
 
 	dataAccess.bitsPerSample = bitsPerSampleTag.data
 
-	switch dataAccess.compressionID {
-	case LZW:
-		dataAccess.compression = &LZWCompression{}
-	case JPEG:
-		if dataAccess.ifd.GetTag(JPEGTables) != nil {
-			tablesTag, ok := dataAccess.ifd.GetTag(JPEGTables).(*ByteTag)
-			if !ok {
-				return &FormatError{msg: "JPEGTables not recorded as byte"}
-			}
+	createFunction := compressionFuncMap[dataAccess.compressionID]
+	if createFunction != nil {
+		dataAccess.compression, err = createFunction(dataAccess)
 
-			r := bytes.NewReader(tablesTag.data)
-
-			header, err := jpeg.DecodeHeader(r)
-			if err != nil {
-				return err
-			}
-
-			dataAccess.compression = &JPEGCompression{header: header}
-		} else {
-			return &FormatError{msg: "No JPEGTables tag, unsupported form of JPEG compression"}
+		if err != nil {
+			return err
 		}
-	default:
+		if dataAccess.compression == nil {
+			return &FormatError{msg: "Unsupported compression scheme " + dataAccess.compressionID.String() + " - missing function"}
+		}
+	} else {
 		return &FormatError{msg: "Unsupported compression scheme " + dataAccess.compressionID.String()}
 	}
 
 	return nil
+}
+
+func (dataAccess *baseDataAccess) GetTag(tagID TagID) Tag {
+	return dataAccess.ifd.GetTag(tagID)
 }
 
 func (dataAccess *baseDataAccess) GetPhotometricInterpretation() PhotometricInterpretationID {
