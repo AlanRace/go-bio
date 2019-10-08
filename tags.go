@@ -274,6 +274,8 @@ type Tag interface {
 	GetType() DataTypeID
 	String() string
 	GetValueAsString() string
+
+	writeTag(writer io.WriteSeeker, order binary.ByteOrder, overflowOffset int64) (int64, error)
 }
 
 type baseTag struct {
@@ -292,6 +294,22 @@ func (tag *baseTag) GetTagID() TagID {
 
 func (tag *baseTag) GetType() DataTypeID {
 	return tag.Type
+}
+
+func (tag *baseTag) writeTagHeader(writer io.Writer, order binary.ByteOrder) error {
+	var err error
+
+	err = binary.Write(writer, order, tag.TagID)
+	if err != nil {
+		return err
+	}
+
+	err = binary.Write(writer, order, tag.Type)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type ByteTag struct {
@@ -318,6 +336,51 @@ func (tag *ByteTag) process(tiffFile *File, tagData *TagData) {
 		// TODO: Do something with the error
 		tiffFile.file.Seek(startLocation, io.SeekStart)
 	}
+}
+
+func (tag *ByteTag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, overflowOffset int64) (int64, error) {
+	var err error
+
+	err = tag.writeTagHeader(writer, order)
+	if err != nil {
+		return overflowOffset, err
+	}
+
+	// Write the DataCount
+	err = binary.Write(writer, order, uint32(len(tag.data)))
+	if err != nil {
+		return overflowOffset, err
+	}
+
+	if len(tag.data) > 4 {
+		// Must use overflow
+		err = binary.Write(writer, order, uint32(overflowOffset))
+		if err != nil {
+			return 0, err
+		}
+
+		_, err = writer.Seek(overflowOffset, io.SeekStart)
+		if err != nil {
+			return overflowOffset, err
+		}
+
+		err = binary.Write(writer, order, tag.data)
+		if err != nil {
+			return overflowOffset, err
+		}
+
+		overflowOffset, err = writer.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return overflowOffset, err
+		}
+	} else {
+		err = binary.Write(writer, order, tag.data)
+		if err != nil {
+			return overflowOffset, err
+		}
+	}
+
+	return overflowOffset, nil
 }
 
 func (tag *ByteTag) String() string {
@@ -353,6 +416,53 @@ func (tag *ASCIITag) process(tiffFile *File, tagData *TagData) {
 	}
 }
 
+func (tag *ASCIITag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, overflowOffset int64) (int64, error) {
+	var err error
+
+	err = tag.writeTagHeader(writer, order)
+	if err != nil {
+		return overflowOffset, err
+	}
+
+	data := []byte(tag.data)
+
+	// Write the DataCount
+	err = binary.Write(writer, order, uint32(len(data)))
+	if err != nil {
+		return overflowOffset, err
+	}
+
+	if len(data) > 4 {
+		// Must use overflow
+		err = binary.Write(writer, order, uint32(overflowOffset))
+		if err != nil {
+			return 0, err
+		}
+
+		_, err = writer.Seek(overflowOffset, io.SeekStart)
+		if err != nil {
+			return overflowOffset, err
+		}
+
+		err = binary.Write(writer, order, data)
+		if err != nil {
+			return overflowOffset, err
+		}
+
+		overflowOffset, err = writer.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return overflowOffset, err
+		}
+	} else {
+		err = binary.Write(writer, order, data)
+		if err != nil {
+			return overflowOffset, err
+		}
+	}
+
+	return overflowOffset, nil
+}
+
 func (tag *ASCIITag) String() string {
 	return tagNameMap[tag.TagID] + ": " + tag.GetValueAsString()
 }
@@ -385,6 +495,51 @@ func (tag *ShortTag) process(tiffFile *File, tagData *TagData) {
 			tag.data[1] = uint16(tagData.DataOffset >> 16)
 		}
 	}
+}
+
+func (tag *ShortTag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, overflowOffset int64) (int64, error) {
+	var err error
+
+	err = tag.writeTagHeader(writer, order)
+	if err != nil {
+		return overflowOffset, err
+	}
+
+	// Write the DataCount
+	err = binary.Write(writer, order, uint32(len(tag.data)))
+	if err != nil {
+		return overflowOffset, err
+	}
+
+	if len(tag.data) > 2 {
+		// Must use overflow
+		err = binary.Write(writer, order, uint32(overflowOffset))
+		if err != nil {
+			return 0, err
+		}
+
+		_, err = writer.Seek(overflowOffset, io.SeekStart)
+		if err != nil {
+			return overflowOffset, err
+		}
+
+		err = binary.Write(writer, order, tag.data)
+		if err != nil {
+			return overflowOffset, err
+		}
+
+		overflowOffset, err = writer.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return overflowOffset, err
+		}
+	} else {
+		err = binary.Write(writer, order, tag.data)
+		if err != nil {
+			return overflowOffset, err
+		}
+	}
+
+	return overflowOffset, nil
 }
 
 func (tag *ShortTag) String() string {
@@ -423,6 +578,44 @@ func (tag *RationalTag) process(tiffFile *File, tagData *TagData) {
 	tiffFile.file.Seek(startLocation, io.SeekStart)
 }
 
+func (tag *RationalTag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, overflowOffset int64) (int64, error) {
+	var err error
+
+	err = tag.writeTagHeader(writer, order)
+	if err != nil {
+		return overflowOffset, err
+	}
+
+	// Write the DataCount
+	err = binary.Write(writer, order, uint32(len(tag.data)))
+	if err != nil {
+		return overflowOffset, err
+	}
+
+	// Must use overflow
+	err = binary.Write(writer, order, uint32(overflowOffset))
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = writer.Seek(overflowOffset, io.SeekStart)
+	if err != nil {
+		return overflowOffset, err
+	}
+
+	err = binary.Write(writer, order, tag.data)
+	if err != nil {
+		return overflowOffset, err
+	}
+
+	overflowOffset, err = writer.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return overflowOffset, err
+	}
+
+	return overflowOffset, nil
+}
+
 func (tag *RationalTag) String() string {
 	return tagNameMap[tag.TagID] + ": " + tag.GetValueAsString()
 }
@@ -451,6 +644,51 @@ func (tag *LongTag) process(tiffFile *File, tagData *TagData) {
 		// TODO: Do something with the error
 		tiffFile.file.Seek(startLocation, io.SeekStart)
 	}
+}
+
+func (tag *LongTag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, overflowOffset int64) (int64, error) {
+	var err error
+
+	err = tag.writeTagHeader(writer, order)
+	if err != nil {
+		return overflowOffset, err
+	}
+
+	// Write the DataCount
+	err = binary.Write(writer, order, uint32(len(tag.data)))
+	if err != nil {
+		return overflowOffset, err
+	}
+
+	if len(tag.data) > 1 {
+		// Must use overflow
+		err = binary.Write(writer, order, uint32(overflowOffset))
+		if err != nil {
+			return 0, err
+		}
+
+		_, err = writer.Seek(overflowOffset, io.SeekStart)
+		if err != nil {
+			return overflowOffset, err
+		}
+
+		err = binary.Write(writer, order, tag.data)
+		if err != nil {
+			return overflowOffset, err
+		}
+
+		overflowOffset, err = writer.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return overflowOffset, err
+		}
+	} else {
+		err = binary.Write(writer, order, tag.data)
+		if err != nil {
+			return overflowOffset, err
+		}
+	}
+
+	return overflowOffset, nil
 }
 
 func (tag *LongTag) String() string {
