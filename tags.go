@@ -5,11 +5,34 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"sort"
 	"strconv"
 )
 
 // TagID captures the ID of common Tiff tags
 type TagID uint16
+type TagIDSlice []TagID
+
+// Len is the number of elements in the collection.
+func (slice TagIDSlice) Len() int {
+	return len(slice)
+}
+
+// Less reports whether the element with
+// index i should sort before the element with index j.
+func (slice TagIDSlice) Less(i, j int) bool {
+	return slice[i] < slice[j]
+}
+
+// Swap swaps the elements with indexes i and j.
+func (slice TagIDSlice) Swap(i, j int) {
+	tmp := slice[i]
+	slice[i] = slice[j]
+	slice[j] = tmp
+}
+
+// Sort is a convenience method.
+func (slice TagIDSlice) Sort() { sort.Sort(slice) }
 
 const (
 	NewSubFileType TagID = 254
@@ -425,6 +448,7 @@ func (tag *ASCIITag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, ove
 	}
 
 	data := []byte(tag.data)
+	data = append(data, '\000')
 
 	// Write the DataCount
 	err = binary.Write(writer, order, uint32(len(data)))
@@ -552,12 +576,61 @@ func (tag *ShortTag) GetValueAsString() string {
 
 // TODO: Check why this order of the member variables works and the other way around doesn't...
 type RationalNumber struct {
-	Denomiator uint32
-	Numerator  uint32
+	Denominator uint32
+	Numerator   uint32
 }
 
 func (rational *RationalNumber) GetValue() float64 {
-	return float64(rational.Numerator) / float64(rational.Denomiator)
+	return float64(rational.Numerator) / float64(rational.Denominator)
+}
+
+func NewRationalNumber(value float64) *RationalNumber {
+	var newRat RationalNumber
+	var a, b, c, d int
+	a = 0
+	b = 1
+	c = 1
+	d = 1
+
+	maxVal := 2 ^ 32
+
+	for b < maxVal && d < maxVal {
+		mediant := float64(a+c) / float64(b+d)
+		if value == mediant {
+			if b+d < maxVal {
+				newRat.Numerator = uint32(a + c)
+				newRat.Denominator = uint32(b + d)
+
+				return &newRat
+			} else if d > b {
+				newRat.Numerator = uint32(c)
+				newRat.Denominator = uint32(b)
+
+				return &newRat
+			} else {
+				newRat.Numerator = uint32(a)
+				newRat.Denominator = uint32(b)
+
+				return &newRat
+			}
+		} else if value > mediant {
+			a += c
+			b += d
+		} else {
+			c += a
+			d += b
+		}
+	}
+
+	if int(b) > maxVal {
+		newRat.Numerator = uint32(c)
+		newRat.Denominator = uint32(d)
+	} else {
+		newRat.Numerator = uint32(a)
+		newRat.Denominator = uint32(b)
+	}
+
+	return &newRat
 }
 
 type RationalTag struct {

@@ -10,7 +10,6 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	return
 	filename := "X:\\CRUK\\UnifiedWorkflowStudy\\AZ\\OI_from left_136,146.svs"
 
 	tiffFile, err := Open(filename)

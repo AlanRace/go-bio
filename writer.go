@@ -114,6 +114,21 @@ func (writer *TiffWriter) NewTiledIFD(image Image) *TiledIFDWriter {
 	return &ifdWriter
 }
 
+func (writer *TiledIFDWriter) SetTileSize(width, height uint32) {
+	writer.ifd.PutTag(&LongTag{baseTag: baseTag{TagID: TileWidth, Type: Long}, data: []uint32{width}})
+	writer.ifd.PutTag(&LongTag{baseTag: baseTag{TagID: TileLength, Type: Long}, data: []uint32{height}})
+}
+
+func (writer *TiledIFDWriter) SetResolution(x, y float64, unit ResolutionUnitID) {
+	xRes := NewRationalNumber(x)
+	yRes := NewRationalNumber(y)
+
+	writer.ifd.PutTag(&RationalTag{baseTag: baseTag{TagID: XResolution, Type: Rational}, data: []RationalNumber{*xRes}})
+	writer.ifd.PutTag(&RationalTag{baseTag: baseTag{TagID: YResolution, Type: Rational}, data: []RationalNumber{*yRes}})
+
+	writer.ifd.PutTag(&ShortTag{baseTag: baseTag{TagID: ResolutionUnit, Type: Short}, data: []uint16{uint16(unit)}})
+}
+
 func (writer *TiledIFDWriter) getFile() *os.File {
 	return writer.tiffWriter.getFile()
 }
@@ -132,18 +147,23 @@ func (writer *TiledIFDWriter) Write() error {
 
 	// TODO: Write data, update tags
 	tileIndex := 0
+	nullByte := byte(0)
 
 	for tilesY := uint32(0); tilesY < tilesDown; tilesY++ {
 		for tilesX := uint32(0); tilesX < tilesAcross; tilesX++ {
 			var tileData []byte
 
-			for y := (tilesY * tileLength); y < ((tilesY+1)*tileLength) && y < writer.image.Height(); y++ {
-				for x := (tilesX * tileWidth); x < ((tilesX+1)*tileWidth) && x < writer.image.Width(); x++ {
-					data := writer.image.PixelAt(x, y)
+			for y := (tilesY * tileLength); y < ((tilesY + 1) * tileLength); y++ {
+				for x := (tilesX * tileWidth); x < ((tilesX + 1) * tileWidth); x++ {
+					if y < writer.image.Height() && x < writer.image.Width() {
+						data := writer.image.PixelAt(x, y)
 
-					// TODO: Convert to byte
-					for _, value := range data {
-						tileData = append(tileData, byte(value))
+						// TODO: Convert to byte
+						for _, value := range data {
+							tileData = append(tileData, byte(value))
+						}
+					} else {
+						tileData = append(tileData, nullByte)
 					}
 				}
 			}
@@ -201,10 +221,18 @@ func (writer *TiledIFDWriter) Write() error {
 
 	//dataLocationTagOffset := int64(0)
 
-	for _, tag := range writer.ifd.Tags {
+	// Make sure that tags are in accending order
+	var tagIDs TagIDSlice
+	for tagID := range writer.ifd.Tags {
+		tagIDs = append(tagIDs, tagID)
+	}
+	tagIDs.Sort()
+
+	for _, tagID := range tagIDs {
 		//if tagID == TileOffsets || tagID == StripOffsets {
 		//	dataLocationTagOffset = currentLocation
 		//}
+		tag := writer.ifd.Tags[tagID]
 
 		overflowOffset, err = tag.writeTag(writer.getFile(), writer.order, overflowOffset)
 		if err != nil {

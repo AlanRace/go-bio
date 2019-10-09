@@ -9,11 +9,11 @@ type TestImage struct {
 }
 
 func (image *TestImage) Width() uint32 {
-	return 123
+	return 100
 }
 
 func (image *TestImage) Height() uint32 {
-	return 123
+	return 100
 }
 func (image *TestImage) PixelAt(x, y uint32) []float64 {
 	return []float64{float64(x + y)}
@@ -30,5 +30,7 @@ func TestCreate(t *testing.T) {
 	var image TestImage
 
 	ifdWriter := writer.NewTiledIFD(&image)
+	ifdWriter.SetResolution(0.7, 0.7, Centimeter)
+	ifdWriter.SetTileSize(16, 16)
 	ifdWriter.Write()
 }

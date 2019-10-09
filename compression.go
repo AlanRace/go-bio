@@ -39,6 +39,10 @@ func AddCompression(id CompressionID, name string, create func(TagAccess) (Compr
 }
 
 func init() {
+
+	AddCompression(Uncompressed, "Uncompressed", func(dataAccess TagAccess) (CompressionMethod, error) {
+		return &NoCompression{}, nil
+	})
 	AddCompression(LZW, "LZW", func(dataAccess TagAccess) (CompressionMethod, error) {
 		return &LZWCompression{}, nil
 	})
@@ -66,6 +70,15 @@ func init() {
 // CompressionMethod is an interface for decompressing a io.Reader to a []byte.
 type CompressionMethod interface {
 	Decompress(io.Reader) ([]byte, error)
+}
+
+// NoCompression performs no decompression of data.
+type NoCompression struct {
+}
+
+// Decompress extracts bytes from io.Reader.
+func (*NoCompression) Decompress(r io.Reader) ([]byte, error) {
+	return ioutil.ReadAll(r)
 }
 
 // LZWCompression performs LZW decompression of data.

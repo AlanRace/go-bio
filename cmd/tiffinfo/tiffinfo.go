@@ -30,9 +30,13 @@ func main() {
 			fmt.Printf("PhotometricInterpretation: %s\n", ifd.GetPhotometricInterpretation().String())
 			fmt.Printf("%s\n", ifd.GetTag(tiff.PlanarConfiguration))
 			fmt.Printf("Compression: %s\n", ifd.GetCompression().String())
-			x, y, _ := ifd.GetResolution()
 
-			fmt.Printf("Resolution (%d): %f x %f\n", ifd.GetResolutionUnit(), x, y)
+			resTag := ifd.GetTag(tiff.XResolution)
+			if resTag != nil {
+				x, y, _ := ifd.GetResolution()
+
+				fmt.Printf("Resolution (%d): %f x %f\n", ifd.GetResolutionUnit(), x, y)
+			}
 
 			/*if ifd.IsTiled() {
 				dataAccess, ok := ifd.GetDataAccess().(*tiff.TileDataAccess)
