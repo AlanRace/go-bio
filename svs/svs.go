@@ -13,6 +13,8 @@ import (
 const (
 	YCbCrJPEG tiff.CompressionID = 33003
 	RGBJPEG   tiff.CompressionID = 33005
+
+	ImageDepth tiff.TagID = 32997
 )
 
 // LZWCompression performs LZW decompression of data.
@@ -54,6 +56,7 @@ type File struct {
 }
 
 func init() {
+	tiff.AddTag(ImageDepth, "ImageDepth")
 	tiff.AddCompression(RGBJPEG, "JPEG (Aperio RGB)", func(dataAccess tiff.TagAccess) (tiff.CompressionMethod, error) {
 		return &RGBJPEGCompression{}, nil
 	})

@@ -6,6 +6,9 @@ import (
 	"os"
 
 	tiff "github.com/AlanRace/go-bio"
+
+	// Make sure that we include SVS package so we correctly handle SVS files
+	_ "github.com/AlanRace/go-bio/svs"
 )
 
 func main() {
@@ -36,6 +39,19 @@ func main() {
 				x, y, _ := ifd.GetResolution()
 
 				fmt.Printf("Resolution (%d): %f x %f\n", ifd.GetResolutionUnit(), x, y)
+			} else {
+				fmt.Println("Resolution not defined.")
+			}
+
+			fmt.Printf("%s\n", ifd.GetTag(tiff.ImageDescription))
+			fmt.Println()
+
+			for tagID, tag := range ifd.Tags {
+				if tag.GetNumItems() > 10 {
+					fmt.Printf("%s (%d): [Array not printed]\n", tagID.String(), tagID)
+				} else {
+					fmt.Printf("%v\n", tag)
+				}
 			}
 
 			/*if ifd.IsTiled() {
@@ -48,7 +64,6 @@ func main() {
 				fmt.Printf("Tiles: %d x %d\n", tileWidth, tileHeight)
 			}*/
 
-			fmt.Printf("%s\n", ifd.GetTag(tiff.ImageDescription))
 			fmt.Println()
 		}
 	}

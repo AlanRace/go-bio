@@ -20,6 +20,7 @@ var compressionNameMap = map[CompressionID]string{
 }
 
 var compressionTypeMap = map[uint16]CompressionID{
+	0: Uncompressed,
 	1: Uncompressed,
 	2: CCIT1D,
 	3: CCITGroup3,

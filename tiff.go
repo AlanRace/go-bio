@@ -152,6 +152,12 @@ func (ifd *ImageFileDirectory) setUpDataAccess() error {
 		}
 
 		dataAccess.rowsPerStrip = ifd.GetLongTagValue(RowsPerStrip)
+
+		// In exports from ImageJ it seems like RowsPerStrip is set to 0? In this case, there is a single strip
+		if dataAccess.rowsPerStrip == 0 {
+			dataAccess.rowsPerStrip = dataAccess.imageLength
+		}
+
 		dataAccess.stripsInImage = dataAccess.imageLength / dataAccess.rowsPerStrip
 
 		stripOffsetsTag, ok := ifd.Tags[StripOffsets].(*LongTag)

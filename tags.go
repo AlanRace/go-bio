@@ -163,6 +163,15 @@ var tagNameMap = map[TagID]string{
 	//OptimisationEntries:    "OptimisationEntries",
 }
 
+func (tagID TagID) String() string {
+	return tagNameMap[tagID]
+}
+
+func AddTag(tagID TagID, description string) {
+	tagIDMap[uint16(tagID)] = tagID
+	tagNameMap[tagID] = description
+}
+
 type DataTypeID uint16
 
 const (
@@ -291,12 +300,14 @@ var resolutionUnitTypeMap = map[uint16]ResolutionUnitID{
 }
 
 type Tag interface {
-	process(tiffFile *File, tagData *TagData)
+	process(tiffFile *File, tagData *tagData)
 
 	GetTagID() TagID
 	GetType() DataTypeID
 	String() string
 	GetValueAsString() string
+	// GetNumItems returns the number of items stored in the tag (length of array)
+	GetNumItems() int
 
 	writeTag(writer io.WriteSeeker, order binary.ByteOrder, overflowOffset int64) (int64, error)
 }
@@ -306,7 +317,7 @@ type baseTag struct {
 	Type  DataTypeID
 }
 
-func (tag *baseTag) processBaseTag(tagData *TagData) {
+func (tag *baseTag) processBaseTag(tagData *tagData) {
 	tag.TagID = tagIDMap[tagData.TagID]
 	tag.Type = dataTypeMap[tagData.DataType]
 }
@@ -341,7 +352,12 @@ type ByteTag struct {
 	data []byte
 }
 
-func (tag *ByteTag) process(tiffFile *File, tagData *TagData) {
+// GetNumItems returns the number of items stored in the tag (length of array)
+func (tag *ByteTag) GetNumItems() int {
+	return len(tag.data)
+}
+
+func (tag *ByteTag) process(tiffFile *File, tagData *tagData) {
 	tag.processBaseTag(tagData)
 
 	if tagData.DataCount <= 4 {
@@ -420,7 +436,12 @@ type ASCIITag struct {
 	data string
 }
 
-func (tag *ASCIITag) process(tiffFile *File, tagData *TagData) {
+// GetNumItems returns the number of items stored in the tag (length of array)
+func (tag *ASCIITag) GetNumItems() int {
+	return len(tag.data)
+}
+
+func (tag *ASCIITag) process(tiffFile *File, tagData *tagData) {
 	tag.processBaseTag(tagData)
 	data := make([]byte, tagData.DataCount)
 
@@ -488,7 +509,7 @@ func (tag *ASCIITag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, ove
 }
 
 func (tag *ASCIITag) String() string {
-	return tagNameMap[tag.TagID] + ": " + tag.GetValueAsString()
+	return fmt.Sprintf("%s (%d): %s", tagNameMap[tag.TagID], tag.TagID, tag.GetValueAsString())
 }
 
 func (tag *ASCIITag) GetValueAsString() string {
@@ -501,7 +522,12 @@ type ShortTag struct {
 	data []uint16
 }
 
-func (tag *ShortTag) process(tiffFile *File, tagData *TagData) {
+// GetNumItems returns the number of items stored in the tag (length of array)
+func (tag *ShortTag) GetNumItems() int {
+	return len(tag.data)
+}
+
+func (tag *ShortTag) process(tiffFile *File, tagData *tagData) {
 	tag.processBaseTag(tagData)
 	tag.data = make([]uint16, tagData.DataCount)
 
@@ -567,7 +593,7 @@ func (tag *ShortTag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, ove
 }
 
 func (tag *ShortTag) String() string {
-	return tagNameMap[tag.TagID] + ": " + tag.GetValueAsString()
+	return fmt.Sprintf("%s (%d): %s", tagNameMap[tag.TagID], tag.TagID, tag.GetValueAsString())
 }
 
 func (tag *ShortTag) GetValueAsString() string {
@@ -639,7 +665,12 @@ type RationalTag struct {
 	data []RationalNumber
 }
 
-func (tag *RationalTag) process(tiffFile *File, tagData *TagData) {
+// GetNumItems returns the number of items stored in the tag (length of array)
+func (tag *RationalTag) GetNumItems() int {
+	return len(tag.data)
+}
+
+func (tag *RationalTag) process(tiffFile *File, tagData *tagData) {
 	tag.processBaseTag(tagData)
 	tag.data = make([]RationalNumber, tagData.DataCount)
 
@@ -690,7 +721,7 @@ func (tag *RationalTag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, 
 }
 
 func (tag *RationalTag) String() string {
-	return tagNameMap[tag.TagID] + ": " + tag.GetValueAsString()
+	return fmt.Sprintf("%s (%d): %s", tagNameMap[tag.TagID], tag.TagID, tag.GetValueAsString())
 }
 
 func (tag *RationalTag) GetValueAsString() string {
@@ -703,7 +734,12 @@ type LongTag struct {
 	data []uint32
 }
 
-func (tag *LongTag) process(tiffFile *File, tagData *TagData) {
+// GetNumItems returns the number of items stored in the tag (length of array)
+func (tag *LongTag) GetNumItems() int {
+	return len(tag.data)
+}
+
+func (tag *LongTag) process(tiffFile *File, tagData *tagData) {
 	tag.processBaseTag(tagData)
 	tag.data = make([]uint32, tagData.DataCount)
 
@@ -765,15 +801,15 @@ func (tag *LongTag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, over
 }
 
 func (tag *LongTag) String() string {
-	return tagNameMap[tag.TagID] + ": " + tag.GetValueAsString()
+	return fmt.Sprintf("%s (%d): %s", tagNameMap[tag.TagID], tag.TagID, tag.GetValueAsString())
 }
 
 func (tag *LongTag) GetValueAsString() string {
 	return fmt.Sprint(tag.data)
 }
 
-// TagData captures the details of a tag as stored in a tiff file.
-type TagData struct {
+// tagData captures the details of a tag as stored in a tiff file.
+type tagData struct {
 	TagID      uint16 /* The tag identifier  */
 	DataType   uint16 /* The scalar type of the data items  */
 	DataCount  uint32 /* The number of items in the tag data  */
@@ -782,8 +818,8 @@ type TagData struct {
 
 func (ifd *ImageFileDirectory) processTags() error {
 	var err error
-	var tags []TagData
-	tags = make([]TagData, ifd.NumTags)
+	var tags []tagData
+	tags = make([]tagData, ifd.NumTags)
 
 	err = binary.Read(ifd.tiffFile.file, ifd.tiffFile.header.Endian, &tags)
 	if err != nil {
