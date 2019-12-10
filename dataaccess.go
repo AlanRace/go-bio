@@ -51,9 +51,18 @@ func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) 
 	dataAccess.tiffFile = ifd.tiffFile
 	dataAccess.ifd = ifd
 	dataAccess.imageWidth, dataAccess.imageLength = ifd.GetImageDimensions()
-	dataAccess.compressionID = ifd.GetCompression()
-	dataAccess.photometricInterpretation = ifd.GetPhotometricInterpretation()
-	dataAccess.samplesPerPixel = ifd.GetShortTagValue(SamplesPerPixel)
+	dataAccess.compressionID, err = ifd.GetCompression()
+	if err != nil {
+		return err
+	}
+	dataAccess.photometricInterpretation, err = ifd.GetPhotometricInterpretation()
+	if err != nil {
+		return err
+	}
+	dataAccess.samplesPerPixel, err = ifd.GetShortTagValue(SamplesPerPixel)
+	if err != nil {
+		return err
+	}
 
 	bitsPerSampleTag, ok := ifd.Tags[BitsPerSample].(*ShortTag)
 	if !ok {

@@ -539,10 +539,12 @@ func (tag *ShortTag) process(tiffFile *File, tagData *tagData) {
 		// TODO: Do something with the error
 		tiffFile.file.Seek(startLocation, io.SeekStart)
 	} else {
-		tag.data[0] = uint16(tagData.DataOffset & 0xffff)
+		tag.data[0] = uint16(tagData.DataOffset >> 16)
+
+		//fmt.Printf("Processing tag %v -> %v (%v) (%v)\n", tag.TagID, tagData.DataOffset, tag.data[0])
 
 		if tagData.DataCount == 2 {
-			tag.data[1] = uint16(tagData.DataOffset >> 16)
+			tag.data[1] = uint16(tagData.DataOffset & 0xffff)
 		}
 	}
 }

@@ -29,9 +29,13 @@ func TestLoad(t *testing.T) {
 
 	ifd := tiffFile.IFDList[ifdIndex]
 
-	section := ifd.GetSectionAt(0, 0)
+	fmt.Println(ifd.GetPhotometricInterpretation().String())
 
+	section := ifd.GetSectionAt(0, 0)
 	data, err := section.GetRGBAData()
+	if err != nil {
+		panic(err)
+	}
 
 	img := image.NewRGBA(image.Rect(0, 0, int(section.Width), int(section.Height)))
 	img.Pix = data

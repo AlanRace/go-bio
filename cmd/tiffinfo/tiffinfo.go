@@ -26,19 +26,53 @@ func main() {
 		for index, ifd := range file.IFDList {
 			imageWidth, imageHeight := ifd.GetImageDimensions()
 
+			bitsPerSample, err := ifd.GetBitsPerSample()
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			samplesPerPixel, err := ifd.GetSamplesPerPixel()
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			photometricInterpretation, err := ifd.GetPhotometricInterpretation()
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			compression, err := ifd.GetCompression()
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
 			fmt.Printf("- Image %d\n", index)
 			fmt.Printf("Image size: %d x %d\n", imageWidth, imageHeight)
-			fmt.Printf("BitsPerSample: %d\n", ifd.GetBitsPerSample())
-			fmt.Printf("SamplesPerPixel: %d\n", ifd.GetSamplesPerPixel())
-			fmt.Printf("PhotometricInterpretation: %s\n", ifd.GetPhotometricInterpretation().String())
+			fmt.Printf("BitsPerSample: %d\n", bitsPerSample)
+			fmt.Printf("SamplesPerPixel: %d\n", samplesPerPixel)
+			fmt.Printf("PhotometricInterpretation: %s\n", photometricInterpretation.String())
 			fmt.Printf("%s\n", ifd.GetTag(tiff.PlanarConfiguration))
-			fmt.Printf("Compression: %s\n", ifd.GetCompression().String())
+			fmt.Printf("Compression: %s\n", compression.String())
 
 			resTag := ifd.GetTag(tiff.XResolution)
 			if resTag != nil {
-				x, y, _ := ifd.GetResolution()
+				x, y, _, err := ifd.GetResolution()
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
 
-				fmt.Printf("Resolution (%d): %f x %f\n", ifd.GetResolutionUnit(), x, y)
+				resolutionUnit, err := ifd.GetResolutionUnit()
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+
+				fmt.Printf("Resolution (%d): %f x %f\n", resolutionUnit, x, y)
 			} else {
 				fmt.Println("Resolution not defined.")
 			}

@@ -213,6 +213,8 @@ func (ifd *ImageFileDirectory) PutTag(tag Tag) {
 		ifd.Tags = make(map[TagID]Tag)
 	}
 
+	//log.Printf("Found tag %v\n", tag)
+
 	ifd.Tags[tag.GetTagID()] = tag
 }
 
@@ -226,7 +228,9 @@ func (ifd *ImageFileDirectory) GetTag(tagID TagID) Tag {
 	return ifd.Tags[tagID]
 }
 
-func (ifd *ImageFileDirectory) GetShortTagValue(tagID TagID) uint16 {
+// TODO: REMOVE ERROR FROM THIS FUNCTIon
+// Create structure with main tags so that don't need to pass back error on each call - can be done when parsing tags for first time
+func (ifd *ImageFileDirectory) GetShortTagValue(tagID TagID) (uint16, error) {
 	tag := ifd.Tags[tagID]
 	var value uint16
 
@@ -237,9 +241,10 @@ func (ifd *ImageFileDirectory) GetShortTagValue(tagID TagID) uint16 {
 		value = shortTag.data[0]
 	} else {
 		// TODO: Error
+		return 0, &FormatError{msg: fmt.Sprintf("Couldn't convert tag to short (%s): %v", tagID.String(), tag)}
 	}
 
-	return value
+	return value, nil
 }
 
 func (ifd *ImageFileDirectory) GetLongTagValue(tagID TagID) uint32 {
@@ -281,34 +286,49 @@ func (ifd *ImageFileDirectory) GetImageDimensions() (uint32, uint32) {
 	return ifd.GetLongTagValue(ImageWidth), ifd.GetLongTagValue(ImageLength)
 }
 
-func (ifd *ImageFileDirectory) GetResolution() (float64, float64, ResolutionUnitID) {
-	return ifd.GetRationalTagValue(XResolution), ifd.GetRationalTagValue(YResolution), ifd.GetResolutionUnit()
+func (ifd *ImageFileDirectory) GetResolution() (float64, float64, ResolutionUnitID, error) {
+	resoutionUnit, err := ifd.GetResolutionUnit()
+	if err != nil {
+		return 0.0, 0.0, 0, err
+	}
+
+	return ifd.GetRationalTagValue(XResolution), ifd.GetRationalTagValue(YResolution), resoutionUnit, nil
 }
 
-func (ifd *ImageFileDirectory) GetBitsPerSample() uint16 {
+func (ifd *ImageFileDirectory) GetBitsPerSample() (uint16, error) {
 	return ifd.GetShortTagValue(BitsPerSample)
 }
 
-func (ifd *ImageFileDirectory) GetSamplesPerPixel() uint16 {
+func (ifd *ImageFileDirectory) GetSamplesPerPixel() (uint16, error) {
 	return ifd.GetShortTagValue(SamplesPerPixel)
 }
 
-func (ifd *ImageFileDirectory) GetCompression() CompressionID {
-	compressionID := ifd.GetShortTagValue(Compression)
+func (ifd *ImageFileDirectory) GetCompression() (CompressionID, error) {
+	compressionID, err := ifd.GetShortTagValue(Compression)
+	if err != nil {
+		// If no compression found, then set to the default of Uncompressed
+		return Uncompressed, nil
+	}
 
-	return compressionTypeMap[compressionID]
+	return compressionTypeMap[compressionID], nil
 }
 
-func (ifd *ImageFileDirectory) GetResolutionUnit() ResolutionUnitID {
-	resolutionUnitID := ifd.GetShortTagValue(ResolutionUnit)
+func (ifd *ImageFileDirectory) GetResolutionUnit() (ResolutionUnitID, error) {
+	resolutionUnitID, err := ifd.GetShortTagValue(ResolutionUnit)
+	if err != nil {
+		return 0, err
+	}
 
-	return resolutionUnitTypeMap[resolutionUnitID]
+	return resolutionUnitTypeMap[resolutionUnitID], nil
 }
 
-func (ifd *ImageFileDirectory) GetPhotometricInterpretation() PhotometricInterpretationID {
-	photometricInterpretationID := ifd.GetShortTagValue(PhotometricInterpretation)
+func (ifd *ImageFileDirectory) GetPhotometricInterpretation() (PhotometricInterpretationID, error) {
+	photometricInterpretationID, err := ifd.GetShortTagValue(PhotometricInterpretation)
+	if err != nil {
+		return 0, err
+	}
 
-	return photometricInterpretationTypeMap[photometricInterpretationID]
+	return photometricInterpretationTypeMap[photometricInterpretationID], nil
 }
 
 /*func (ifd *ImageFileDirectory) GetDataIndexAt(x uint32, y uint32) uint32 {
