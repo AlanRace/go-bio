@@ -19,6 +19,7 @@ type DataAccess interface {
 	GetImage() (image.Image, error)
 
 	GetPhotometricInterpretation() PhotometricInterpretationID
+	GetSamplesPerPixel() uint16
 
 	GetSection(index uint32) *Section
 	GetSectionAt(x, y uint32) *Section
@@ -94,6 +95,10 @@ func (dataAccess *baseDataAccess) GetTag(tagID TagID) Tag {
 
 func (dataAccess *baseDataAccess) GetPhotometricInterpretation() PhotometricInterpretationID {
 	return dataAccess.photometricInterpretation
+}
+
+func (dataAccess *baseDataAccess) GetSamplesPerPixel() uint16 {
+	return dataAccess.samplesPerPixel
 }
 
 func (dataAccess *baseDataAccess) GetImageDimensions() (uint32, uint32) {
@@ -399,6 +404,7 @@ func (section *Section) GetRGBData() ([]byte, error) {
 	switch section.dataAccess.GetPhotometricInterpretation() {
 	case RGB:
 		// TODO: check if the data is interlieved
+		// TODO: check if data has 4 SamplesPerPixel
 
 		return rawData, nil
 	default:
@@ -407,20 +413,31 @@ func (section *Section) GetRGBData() ([]byte, error) {
 }
 
 func (section *Section) GetRGBAData() ([]byte, error) {
-	rawData, err := section.GetRGBData()
-
-	if err != nil {
-		return nil, err
-	}
-
 	var rgba []byte
-	rgba = make([]byte, (len(rawData)/3)*4)
+	var err error
 
-	for i := 0; i < (len(rawData) / 3); i++ {
-		rgba[i*4] = rawData[i*3]
-		rgba[i*4+1] = rawData[i*3+1]
-		rgba[i*4+2] = rawData[i*3+2]
-		rgba[i*4+3] = 255
+	switch section.dataAccess.GetSamplesPerPixel() {
+	case 3:
+		rawData, err := section.GetRGBData()
+
+		if err != nil {
+			return nil, err
+		}
+
+		rgba = make([]byte, (len(rawData)/3)*4)
+
+		for i := 0; i < (len(rawData) / 3); i++ {
+			rgba[i*4] = rawData[i*3]
+			rgba[i*4+1] = rawData[i*3+1]
+			rgba[i*4+2] = rawData[i*3+2]
+			rgba[i*4+3] = 255
+		}
+	case 4:
+		rgba, err = section.GetData()
+
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return rgba, nil
