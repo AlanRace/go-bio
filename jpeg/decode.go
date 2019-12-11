@@ -187,6 +187,8 @@ func decodeSOS(header *JPEGHeader, body *JPEGBody, r io.Reader) (*Data, error) {
 	d.body = body
 	d.r = r
 
+	//log.Printf("decodeSOS: %d, %d, %d\n", d.body.sof0.ImageWidth, d.body.sof0.ImageHeight, len(body.scanComponents))
+
 	d.createData(int(d.body.sof0.ImageWidth), int(d.body.sof0.ImageHeight), len(body.scanComponents))
 
 	zigStart, zigEnd, ah, al := int32(0), int32(blockSize-1), uint32(0), uint32(0)
@@ -508,7 +510,14 @@ func (d *decoder) reconstructBlock(b *block, bx, by, compIndex int) error {
 				c += 128
 			}
 
-			d.data.Data[((by*8+y)*d.data.Width*d.data.Channels)+((bx*8+x)*d.data.Channels)+compIndex] = uint8(c)
+			// TODO: Check why this causes issues with strips that are not regular sizes
+			index := ((by*8 + y) * d.data.Width * d.data.Channels) + ((bx*8 + x) * d.data.Channels) + compIndex
+
+			if index < len(d.data.Data) {
+				d.data.Data[((by*8+y)*d.data.Width*d.data.Channels)+((bx*8+x)*d.data.Channels)+compIndex] = uint8(c)
+			} else {
+				//				log.Printf("Adding point to data %d (%d)\n", index, len(d.data.Data))
+			}
 		}
 	}
 

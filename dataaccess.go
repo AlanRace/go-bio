@@ -3,6 +3,7 @@ package tiff
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"image"
 	"io"
 )
@@ -112,9 +113,16 @@ func (dataAccess *baseDataAccess) GetCompressedData(index uint32) ([]byte, error
 
 	byteData = make([]byte, dataSize)
 
-	// TODO: Error checking!
-	dataAccess.tiffFile.file.Seek(int64(offset), io.SeekStart)
-	binary.Read(dataAccess.tiffFile.file, dataAccess.tiffFile.header.Endian, &byteData)
+	_, err := dataAccess.tiffFile.file.Seek(int64(offset), io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+	err = binary.Read(dataAccess.tiffFile.file, dataAccess.tiffFile.header.Endian, &byteData)
+	if err != nil {
+		return nil, err
+	}
+
+	//log.Printf("GetCompressedData(%d): offset = %d, dataSize = %d. Returned size = %d\n", index, offset, dataSize, len(byteData))
 
 	return byteData, nil
 }
@@ -312,6 +320,7 @@ func (dataAccess *TileDataAccess) GetTileGrid() (uint32, uint32) {
 	return y*dataAccess.tilesAcross + x
 }*/
 
+// GetSectionAt returns the section at the specified pixel coordinate
 func (dataAccess *TileDataAccess) GetSectionAt(x uint32, y uint32) *Section {
 	index := (y/dataAccess.tileLength)*dataAccess.tilesAcross + (x / dataAccess.tileWidth)
 
@@ -438,6 +447,8 @@ func (section *Section) GetRGBAData() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+	default:
+		return nil, &FormatError{msg: fmt.Sprintf("Unsupported SamplesPerPixel: %d", section.dataAccess.GetSamplesPerPixel())}
 	}
 
 	return rgba, nil

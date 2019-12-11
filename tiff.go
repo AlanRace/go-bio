@@ -160,6 +160,11 @@ func (ifd *ImageFileDirectory) setUpDataAccess() error {
 
 		dataAccess.stripsInImage = dataAccess.imageLength / dataAccess.rowsPerStrip
 
+		// Check whether we have enough strips in the image to capture full length
+		if (dataAccess.stripsInImage * dataAccess.rowsPerStrip) < dataAccess.imageLength {
+			dataAccess.stripsInImage++
+		}
+
 		stripOffsetsTag, ok := ifd.Tags[StripOffsets].(*LongTag)
 		if !ok {
 			return &FormatError{msg: "Data stored as strips, but StripOffsets appear to be missing"}
