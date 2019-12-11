@@ -228,7 +228,7 @@ func (ifd *ImageFileDirectory) GetTag(tagID TagID) Tag {
 	return ifd.Tags[tagID]
 }
 
-// TODO: REMOVE ERROR FROM THIS FUNCTIon
+// TODO: REMOVE ERROR FROM THIS FUNCTION
 // Create structure with main tags so that don't need to pass back error on each call - can be done when parsing tags for first time
 func (ifd *ImageFileDirectory) GetShortTagValue(tagID TagID) (uint16, error) {
 	tag := ifd.Tags[tagID]
