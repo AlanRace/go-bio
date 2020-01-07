@@ -1,6 +1,7 @@
 package tiff
 
 import (
+	"bufio"
 	"bytes"
 	"compress/lzw"
 	"io"
@@ -17,17 +18,19 @@ var compressionNameMap = map[CompressionID]string{
 	LZW:          "LZW",
 	OJPEG:        "OJPEG",
 	JPEG:         "JPEG",
+	PackBits:     "PackBits",
 }
 
 var compressionTypeMap = map[uint16]CompressionID{
-	0: Uncompressed,
-	1: Uncompressed,
-	2: CCIT1D,
-	3: CCITGroup3,
-	4: CCITGroup4,
-	5: LZW,
-	6: OJPEG,
-	7: JPEG,
+	0:     Uncompressed,
+	1:     Uncompressed,
+	2:     CCIT1D,
+	3:     CCITGroup3,
+	4:     CCITGroup4,
+	5:     LZW,
+	6:     OJPEG,
+	7:     JPEG,
+	32773: PackBits,
 }
 
 var compressionFuncMap = map[CompressionID]func(TagAccess) (CompressionMethod, error){}
@@ -66,6 +69,9 @@ func init() {
 
 		return nil, &FormatError{msg: "No JPEGTables tag, unsupported form of JPEG compression"}
 	})
+	AddCompression(PackBits, "PackBits", func(dataAccess TagAccess) (CompressionMethod, error) {
+		return &PackBitsCompression{}, nil
+	})
 }
 
 // CompressionMethod is an interface for decompressing a io.Reader to a []byte.
@@ -92,6 +98,62 @@ func (*LZWCompression) Decompress(r io.Reader) ([]byte, error) {
 	defer readCloser.Close()
 
 	return ioutil.ReadAll(readCloser)
+}
+
+type PackBitsCompression struct {
+}
+
+func (*PackBitsCompression) Decompress(r io.Reader) ([]byte, error) {
+	return unpackBits(r)
+}
+
+type byteReader interface {
+	io.Reader
+	io.ByteReader
+}
+
+// unpackBits decodes the PackBits-compressed data in src and returns the
+// uncompressed data.
+//
+// The PackBits compression format is described in section 9 (p. 42)
+// of the TIFF spec.
+func unpackBits(r io.Reader) ([]byte, error) {
+	var n int
+	buf := make([]byte, 128)
+	dst := make([]byte, 0, 1024)
+	br, ok := r.(byteReader)
+	if !ok {
+		br = bufio.NewReader(r)
+	}
+
+	for {
+		b, err := br.ReadByte()
+		if err != nil {
+			if err == io.EOF {
+				return dst, nil
+			}
+			return nil, err
+		}
+		code := int(int8(b))
+		switch {
+		case code >= 0:
+			n, err = io.ReadFull(br, buf[:code+1])
+			if err != nil {
+				return nil, err
+			}
+			dst = append(dst, buf[:n]...)
+		case code == -128:
+			// No-op.
+		default:
+			if b, err = br.ReadByte(); err != nil {
+				return nil, err
+			}
+			for j := 0; j < 1-code; j++ {
+				buf[j] = b
+			}
+			dst = append(dst, buf[:1-code]...)
+		}
+	}
 }
 
 // JPEGCompression

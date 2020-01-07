@@ -229,6 +229,7 @@ const (
 	LZW          CompressionID = 5
 	OJPEG        CompressionID = 6
 	JPEG         CompressionID = 7
+	PackBits     CompressionID = 32773
 )
 
 func (compressionID CompressionID) String() string {

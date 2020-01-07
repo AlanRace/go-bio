@@ -10,7 +10,10 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	filename := "X:\\CRUK\\UnifiedWorkflowStudy\\AZ\\OI_from left_136,146.svs"
+	//filename := "X:\\CRUK\\UnifiedWorkflowStudy\\AZ\\OI_from left_136,146.svs"
+	//filename := "C:\\Work\\PuffPiece\\20191128_3Dunified_blueset_set7_orbisims_307_downsampled3x.tif"
+	//filename := "C:\\Work\\Registration\\20151030_PDAC_set2_neg_80um_s66_Ivis_Lab_10x.tif"
+	filename := "C:\\Work\\AZ\\Stephanie\\20190913_CKD_Adenosine_CXCR2_DESIpos_30um_slide19_Section 09\\meanImage_cluster48.tif"
 
 	tiffFile, err := Open(filename)
 	if err != nil {
@@ -29,7 +32,12 @@ func TestLoad(t *testing.T) {
 
 	ifd := tiffFile.IFDList[ifdIndex]
 
-	fmt.Println(ifd.GetPhotometricInterpretation().String())
+	pi, err := ifd.GetPhotometricInterpretation()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(pi.String())
 
 	section := ifd.GetSectionAt(0, 0)
 	data, err := section.GetRGBAData()
@@ -41,6 +49,38 @@ func TestLoad(t *testing.T) {
 	img.Pix = data
 
 	f, err := os.Create("section.png")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	png.Encode(f, img)
+
+	// Check can output whole file
+	data = nil
+
+	gridX, gridY := ifd.GetSectionGrid()
+	fmt.Printf("Found grid dimensions: %d x %d\n", gridX, gridY)
+
+	for y := uint32(0); y < gridY; y++ {
+		for x := uint32(0); x < gridX; x++ {
+			section := ifd.GetSection(y*gridX + x)
+
+			rgbaData, err := section.GetRGBAData()
+			if err != nil {
+				panic(err)
+			}
+
+			data = append(data, rgbaData...)
+		}
+	}
+
+	fmt.Printf("Loaded data with length %d\n", len(data))
+	width, height := ifd.GetImageDimensions()
+
+	img = image.NewRGBA(image.Rect(0, 0, int(width), int(height)))
+	img.Pix = data
+
+	f, err = os.Create("full.png")
 	if err != nil {
 		panic(err)
 	}

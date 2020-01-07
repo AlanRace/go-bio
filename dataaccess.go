@@ -426,6 +426,22 @@ func (section *Section) GetRGBAData() ([]byte, error) {
 	var err error
 
 	switch section.dataAccess.GetSamplesPerPixel() {
+	case 1:
+		rawData, err := section.GetData()
+
+		if err != nil {
+			return nil, err
+		}
+
+		rgba = make([]byte, len(rawData)*4)
+
+		for i := 0; i < len(rawData); i++ {
+			rgba[i*4] = rawData[i]
+			rgba[i*4+1] = rawData[i]
+			rgba[i*4+2] = rawData[i]
+			rgba[i*4+3] = 255
+		}
+
 	case 3:
 		rawData, err := section.GetRGBData()
 
@@ -448,7 +464,7 @@ func (section *Section) GetRGBAData() ([]byte, error) {
 			return nil, err
 		}
 	default:
-		return nil, &FormatError{msg: fmt.Sprintf("Unsupported SamplesPerPixel: %d", section.dataAccess.GetSamplesPerPixel())}
+		return nil, &FormatError{msg: fmt.Sprintf("Unsupported SamplesPerPixel in GetRGBAData: %d", section.dataAccess.GetSamplesPerPixel())}
 	}
 
 	return rgba, nil
