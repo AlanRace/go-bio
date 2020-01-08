@@ -336,6 +336,20 @@ func (ifd *ImageFileDirectory) GetPhotometricInterpretation() (PhotometricInterp
 	return photometricInterpretationTypeMap[photometricInterpretationID], nil
 }
 
+// IsReducedResolutionImage checks whether the reduced resolution bit is set in the NewSubfileType tag
+// TODO: Check the SubfileType tag as well, to support older versions
+func (ifd *ImageFileDirectory) IsReducedResolutionImage() bool {
+	newSubfileType := ifd.GetLongTagValue(NewSubFileType)
+
+	if newSubfileType == 0 {
+		return false
+	}
+
+	reducedImage := newSubfileType & 0x01
+
+	return reducedImage == 1
+}
+
 /*func (ifd *ImageFileDirectory) GetDataIndexAt(x uint32, y uint32) uint32 {
 	return ifd.dataAccess.GetDataIndexAt(x, y)
 }*/
