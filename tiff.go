@@ -105,7 +105,7 @@ func (tiffFile *File) processIFD(location uint32) error {
 	var err error
 
 	ifd.tiffFile = tiffFile
-
+	// TODO: Make thread safe
 	tiffFile.file.Seek(int64(location), io.SeekStart)
 
 	err = binary.Read(tiffFile.file, tiffFile.header.Endian, &ifd.NumTags)

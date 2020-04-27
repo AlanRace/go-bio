@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"sync"
 )
 
 type DataAccess interface {
@@ -31,6 +32,8 @@ type DataAccess interface {
 type baseDataAccess struct {
 	tiffFile *File
 	ifd      *ImageFileDirectory
+
+	mux sync.Mutex
 
 	imageWidth  uint32
 	imageLength uint32
@@ -113,6 +116,7 @@ func (dataAccess *baseDataAccess) GetCompressedData(index uint32) ([]byte, error
 
 	byteData = make([]byte, dataSize)
 
+	dataAccess.mux.Lock()
 	_, err := dataAccess.tiffFile.file.Seek(int64(offset), io.SeekStart)
 	if err != nil {
 		return nil, err
@@ -121,6 +125,7 @@ func (dataAccess *baseDataAccess) GetCompressedData(index uint32) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
+	dataAccess.mux.Unlock()
 
 	//log.Printf("GetCompressedData(%d): offset = %d, dataSize = %d. Returned size = %d\n", index, offset, dataSize, len(byteData))
 
