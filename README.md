@@ -1,3 +1,3 @@
 # go-bio
 
-Go libaray for accessing tiff files including microsopy formats such as *.qptiff
+Go library for accessing life sciences data such as microscopy data such as *.qptiff
