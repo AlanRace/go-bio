@@ -213,7 +213,7 @@ func processBigShortTag(seeker io.ReadSeeker, endian binary.ByteOrder, tagData *
 
 	tag.Data = make([]uint16, tagData.DataCount)
 
-	if tagData.DataCount > 2 {
+	if tagData.DataCount > 4 {
 		// TODO: Do something with the error
 		startLocation, _ := seeker.Seek(0, io.SeekCurrent)
 		seeker.Seek(int64(tagData.DataOffset), io.SeekStart)
@@ -221,17 +221,30 @@ func processBigShortTag(seeker io.ReadSeeker, endian binary.ByteOrder, tagData *
 		// TODO: Do something with the error
 		seeker.Seek(startLocation, io.SeekStart)
 	} else {
-		if endian == binary.BigEndian {
-			tag.Data[0] = uint16(tagData.DataOffset >> 16)
 
-			if tagData.DataCount == 2 {
-				tag.Data[1] = uint16(tagData.DataOffset & 0xffff)
+		if endian == binary.BigEndian {
+			tag.Data[0] = uint16(tagData.DataOffset >> 48)
+
+			if tagData.DataCount > 1 {
+				tag.Data[1] = uint16((tagData.DataOffset >> 32) & 0xffffffffffff)
+			}
+			if tagData.DataCount > 2 {
+				tag.Data[2] = uint16((tagData.DataOffset >> 16) & 0xffffffffffff)
+			}
+			if tagData.DataCount > 3 {
+				tag.Data[2] = uint16(tagData.DataOffset & 0xffffffffffff)
 			}
 		} else {
-			tag.Data[0] = uint16(tagData.DataOffset & 0xffff)
+			tag.Data[0] = uint16(tagData.DataOffset & 0xffffffffffff)
 
-			if tagData.DataCount == 2 {
-				tag.Data[1] = uint16(tagData.DataOffset >> 16)
+			if tagData.DataCount > 1 {
+				tag.Data[1] = uint16((tagData.DataOffset >> 16) & 0xffffffffffff)
+			}
+			if tagData.DataCount > 2 {
+				tag.Data[2] = uint16((tagData.DataOffset >> 32) & 0xffffffffffff)
+			}
+			if tagData.DataCount > 3 {
+				tag.Data[3] = uint16(tagData.DataOffset >> 48)
 			}
 		}
 

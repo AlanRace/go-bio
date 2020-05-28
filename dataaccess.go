@@ -154,6 +154,8 @@ func (dataAccess *baseDataAccess) PixelSizeInBytes() uint32 {
 	var size uint32
 	var sampleIndex uint16
 
+	//fmt.Printf("BitsPerSample: %v\n", dataAccess.bitsPerSample)
+
 	for sampleIndex = 0; sampleIndex < dataAccess.samplesPerPixel; sampleIndex++ {
 		size += uint32(dataAccess.bitsPerSample[sampleIndex] / 8)
 	}
@@ -258,6 +260,7 @@ func (dataAccess *StripDataAccess) GetSection(index uint32) *Section {
 }*/
 
 func (dataAccess *StripDataAccess) GetStripInBytes() uint32 {
+	//fmt.Printf("Width: %d, RowsPerStrip %d, PixelSize %v\n", dataAccess.imageWidth, dataAccess.rowsPerStrip, dataAccess.PixelSizeInBytes())
 	return dataAccess.imageWidth * dataAccess.rowsPerStrip * dataAccess.PixelSizeInBytes()
 }
 
@@ -266,6 +269,8 @@ func (dataAccess *StripDataAccess) GetFullData() ([]byte, error) {
 	fullData := make([]byte, dataAccess.ImageSizeInBytes())
 
 	bytesPerStrip := dataAccess.GetStripInBytes()
+
+	//fmt.Printf("BytesPerStrip: %d\n", bytesPerStrip)
 
 	for stripIndex = 0; stripIndex < dataAccess.stripsInImage; stripIndex++ {
 		stripData, err := dataAccess.GetData(stripIndex)
