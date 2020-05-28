@@ -98,7 +98,7 @@ func Open(path string) (*File, error) {
 			return nil, &FormatError{msg: "ImageDescription is not ASCII type"}
 		}
 
-		imageDetailsString := imageDetailsTag.GetValueAsString()
+		imageDetailsString := imageDetailsTag.ValueAsString()
 		// Remove first line, as the string is not actually encoded as UTF-16
 		imageDetailsString = strings.Replace(imageDetailsString, "<?xml version=\"1.0\" encoding=\"utf-16\"?>", "", 1)
 		var imageDetails ImageDescription

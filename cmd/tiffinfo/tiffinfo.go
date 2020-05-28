@@ -8,12 +8,13 @@ import (
 	tiff "github.com/AlanRace/go-bio"
 
 	// Make sure that we include SVS package so we correctly handle SVS files
+	"github.com/AlanRace/go-bio/qptiff"
 	_ "github.com/AlanRace/go-bio/svs"
 )
 
 func main() {
 	if len(os.Args) > 1 {
-		file, err := tiff.Open(os.Args[1])
+		file, err := qptiff.Open(os.Args[1])
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -81,7 +82,7 @@ func main() {
 			fmt.Println()
 
 			for tagID, tag := range ifd.Tags {
-				if tag.GetNumItems() > 10 {
+				if tag.NumItems() > 10 {
 					fmt.Printf("%s (%d): [Array not printed]\n", tagID.String(), tagID)
 				} else {
 					fmt.Printf("%v\n", tag)

@@ -1,10 +1,7 @@
-package tiff
+package gobio
 
 import (
-	"encoding/binary"
 	"fmt"
-	"io"
-	"log"
 	"sort"
 	"strconv"
 )
@@ -172,6 +169,18 @@ func AddTag(tagID TagID, description string) {
 	tagNameMap[tagID] = description
 }
 
+func TagFromID(tagID uint16) TagID {
+	return tagIDMap[tagID]
+}
+
+func TagName(tagID TagID) string {
+	return tagNameMap[tagID]
+}
+
+func TagNameFromID(tagID uint16) string {
+	return tagNameMap[TagID(tagID)]
+}
+
 type DataTypeID uint16
 
 const (
@@ -187,6 +196,10 @@ const (
 	SRational DataTypeID = 10
 	Float     DataTypeID = 11
 	Double    DataTypeID = 12
+
+	Long8  DataTypeID = 16
+	SLong8 DataTypeID = 17
+	IFD8   DataTypeID = 18
 )
 
 var dataTypeMap = map[uint16]DataTypeID{
@@ -202,6 +215,10 @@ var dataTypeMap = map[uint16]DataTypeID{
 	10: SRational,
 	11: Float,
 	12: Double,
+
+	16: Long8,
+	17: SLong8,
+	18: IFD8,
 }
 
 var dataTypeNameMap = map[DataTypeID]string{
@@ -217,6 +234,22 @@ var dataTypeNameMap = map[DataTypeID]string{
 	SRational: "SRational",
 	Float:     "Float",
 	Double:    "Double",
+
+	Long8:  "Long8",
+	SLong8: "SLong8",
+	IFD8:   "IFD8",
+}
+
+func DataTypeFromID(id uint16) DataTypeID {
+	return dataTypeMap[id]
+}
+
+func DataTypeName(typeID DataTypeID) string {
+	return dataTypeNameMap[typeID]
+}
+
+func DataTypeNameFromID(typeID uint16) string {
+	return dataTypeNameMap[DataTypeID(typeID)]
 }
 
 type CompressionID uint16
@@ -301,314 +334,83 @@ var resolutionUnitTypeMap = map[uint16]ResolutionUnitID{
 }
 
 type Tag interface {
-	process(tiffFile *File, tagData *tagData)
-
-	GetTagID() TagID
-	GetType() DataTypeID
+	TagID() TagID
 	String() string
-	GetValueAsString() string
-	// GetNumItems returns the number of items stored in the tag (length of array)
-	GetNumItems() int
-
-	writeTag(writer io.WriteSeeker, order binary.ByteOrder, overflowOffset int64) (int64, error)
-}
-
-type baseTag struct {
-	TagID TagID
-	Type  DataTypeID
-}
-
-func (tag *baseTag) processBaseTag(tagData *tagData) {
-	tag.TagID = tagIDMap[tagData.TagID]
-	tag.Type = dataTypeMap[tagData.DataType]
-}
-
-func (tag *baseTag) GetTagID() TagID {
-	return tag.TagID
-}
-
-func (tag *baseTag) GetType() DataTypeID {
-	return tag.Type
-}
-
-func (tag *baseTag) writeTagHeader(writer io.Writer, order binary.ByteOrder) error {
-	var err error
-
-	err = binary.Write(writer, order, tag.TagID)
-	if err != nil {
-		return err
-	}
-
-	err = binary.Write(writer, order, tag.Type)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	ValueAsString() string
+	// NumItems returns the number of items stored in the tag (length of array)
+	NumItems() int
 }
 
 type ByteTag struct {
-	baseTag
+	ID       TagID
+	DataType DataTypeID
 
-	data []byte
+	Data []byte
 }
 
-// GetNumItems returns the number of items stored in the tag (length of array)
-func (tag *ByteTag) GetNumItems() int {
-	return len(tag.data)
+func (tag ByteTag) TagID() TagID {
+	return tag.ID
 }
 
-func (tag *ByteTag) process(tiffFile *File, tagData *tagData) {
-	tag.processBaseTag(tagData)
-
-	if tagData.DataCount <= 4 {
-		a := make([]byte, 4)
-		tiffFile.header.Endian.PutUint32(a, tagData.DataOffset)
-
-		tag.data = a[:tagData.DataCount]
-	} else {
-		tag.data = make([]byte, tagData.DataCount)
-
-		// TODO: Do something with the error
-		startLocation, _ := tiffFile.file.Seek(0, io.SeekCurrent)
-		tiffFile.file.Seek(int64(tagData.DataOffset), io.SeekStart)
-		binary.Read(tiffFile.file, tiffFile.header.Endian, &tag.data)
-		// TODO: Do something with the error
-		tiffFile.file.Seek(startLocation, io.SeekStart)
-	}
+// NumItems returns the number of items stored in the tag (length of array)
+func (tag ByteTag) NumItems() int {
+	return len(tag.Data)
 }
 
-func (tag *ByteTag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, overflowOffset int64) (int64, error) {
-	var err error
-
-	err = tag.writeTagHeader(writer, order)
-	if err != nil {
-		return overflowOffset, err
-	}
-
-	// Write the DataCount
-	err = binary.Write(writer, order, uint32(len(tag.data)))
-	if err != nil {
-		return overflowOffset, err
-	}
-
-	if len(tag.data) > 4 {
-		// Must use overflow
-		err = binary.Write(writer, order, uint32(overflowOffset))
-		if err != nil {
-			return 0, err
-		}
-
-		_, err = writer.Seek(overflowOffset, io.SeekStart)
-		if err != nil {
-			return overflowOffset, err
-		}
-
-		err = binary.Write(writer, order, tag.data)
-		if err != nil {
-			return overflowOffset, err
-		}
-
-		overflowOffset, err = writer.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return overflowOffset, err
-		}
-	} else {
-		err = binary.Write(writer, order, tag.data)
-		if err != nil {
-			return overflowOffset, err
-		}
-	}
-
-	return overflowOffset, nil
+func (tag ByteTag) String() string {
+	return tagNameMap[tag.ID] + ": " + tag.ValueAsString()
 }
 
-func (tag *ByteTag) String() string {
-	return tagNameMap[tag.TagID] + ": " + tag.GetValueAsString()
-}
-
-func (tag *ByteTag) GetValueAsString() string {
-	return fmt.Sprint(tag.data)
+func (tag ByteTag) ValueAsString() string {
+	return fmt.Sprint(tag.Data)
 }
 
 type ASCIITag struct {
-	baseTag
+	ID       TagID
+	DataType DataTypeID
 
-	data string
+	Data string
 }
 
-// GetNumItems returns the number of items stored in the tag (length of array)
-func (tag *ASCIITag) GetNumItems() int {
-	return len(tag.data)
+func (tag ASCIITag) TagID() TagID {
+	return tag.ID
 }
 
-func (tag *ASCIITag) process(tiffFile *File, tagData *tagData) {
-	tag.processBaseTag(tagData)
-	data := make([]byte, tagData.DataCount)
-
-	if tagData.DataCount <= 4 {
-		log.Printf("NOT IMPLEMENTED: %s\n", string(tagData.DataOffset))
-		//tag.data[0] = tagData.DataOffset
-	} else {
-		// TODO: Do something with the error
-		startLocation, _ := tiffFile.file.Seek(0, io.SeekCurrent)
-		tiffFile.file.Seek(int64(tagData.DataOffset), io.SeekStart)
-		binary.Read(tiffFile.file, tiffFile.header.Endian, &data)
-		// TODO: Do something with the error
-		tiffFile.file.Seek(startLocation, io.SeekStart)
-
-		tag.data = string(data)
-	}
+// NumItems returns the number of items stored in the tag (length of array)
+func (tag ASCIITag) NumItems() int {
+	return len(tag.Data)
 }
 
-func (tag *ASCIITag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, overflowOffset int64) (int64, error) {
-	var err error
-
-	err = tag.writeTagHeader(writer, order)
-	if err != nil {
-		return overflowOffset, err
-	}
-
-	data := []byte(tag.data)
-	data = append(data, '\000')
-
-	// Write the DataCount
-	err = binary.Write(writer, order, uint32(len(data)))
-	if err != nil {
-		return overflowOffset, err
-	}
-
-	if len(data) > 4 {
-		// Must use overflow
-		err = binary.Write(writer, order, uint32(overflowOffset))
-		if err != nil {
-			return 0, err
-		}
-
-		_, err = writer.Seek(overflowOffset, io.SeekStart)
-		if err != nil {
-			return overflowOffset, err
-		}
-
-		err = binary.Write(writer, order, data)
-		if err != nil {
-			return overflowOffset, err
-		}
-
-		overflowOffset, err = writer.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return overflowOffset, err
-		}
-	} else {
-		err = binary.Write(writer, order, data)
-		if err != nil {
-			return overflowOffset, err
-		}
-	}
-
-	return overflowOffset, nil
+func (tag ASCIITag) String() string {
+	return fmt.Sprintf("%s (%d): %s", tagNameMap[tag.ID], tag.ID, tag.ValueAsString())
 }
 
-func (tag *ASCIITag) String() string {
-	return fmt.Sprintf("%s (%d): %s", tagNameMap[tag.TagID], tag.TagID, tag.GetValueAsString())
-}
-
-func (tag *ASCIITag) GetValueAsString() string {
-	return tag.data
+func (tag ASCIITag) ValueAsString() string {
+	return tag.Data
 }
 
 type ShortTag struct {
-	baseTag
+	ID       TagID
+	DataType DataTypeID
 
-	data []uint16
+	Data []uint16
 }
 
-// GetNumItems returns the number of items stored in the tag (length of array)
-func (tag *ShortTag) GetNumItems() int {
-	return len(tag.data)
+func (tag ShortTag) TagID() TagID {
+	return tag.ID
 }
 
-func (tag *ShortTag) process(tiffFile *File, tagData *tagData) {
-	tag.processBaseTag(tagData)
-	tag.data = make([]uint16, tagData.DataCount)
-
-	if tagData.DataCount > 2 {
-		// TODO: Do something with the error
-		startLocation, _ := tiffFile.file.Seek(0, io.SeekCurrent)
-		tiffFile.file.Seek(int64(tagData.DataOffset), io.SeekStart)
-		binary.Read(tiffFile.file, tiffFile.header.Endian, &tag.data)
-		// TODO: Do something with the error
-		tiffFile.file.Seek(startLocation, io.SeekStart)
-	} else {
-		if tiffFile.header.Endian == binary.BigEndian {
-			tag.data[0] = uint16(tagData.DataOffset >> 16)
-
-			if tagData.DataCount == 2 {
-				tag.data[1] = uint16(tagData.DataOffset & 0xffff)
-			}
-		} else {
-			tag.data[0] = uint16(tagData.DataOffset & 0xffff)
-
-			if tagData.DataCount == 2 {
-				tag.data[1] = uint16(tagData.DataOffset >> 16)
-			}
-		}
-
-		//fmt.Printf("Processing tag %v -> %v (%v) (%v)\n", tag.TagID, tagData.DataOffset, tag.data[0])
-	}
+// NumItems returns the number of items stored in the tag (length of array)
+func (tag ShortTag) NumItems() int {
+	return len(tag.Data)
 }
 
-func (tag *ShortTag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, overflowOffset int64) (int64, error) {
-	var err error
-
-	err = tag.writeTagHeader(writer, order)
-	if err != nil {
-		return overflowOffset, err
-	}
-
-	// Write the DataCount
-	err = binary.Write(writer, order, uint32(len(tag.data)))
-	if err != nil {
-		return overflowOffset, err
-	}
-
-	if len(tag.data) > 2 {
-		// Must use overflow
-		err = binary.Write(writer, order, uint32(overflowOffset))
-		if err != nil {
-			return 0, err
-		}
-
-		_, err = writer.Seek(overflowOffset, io.SeekStart)
-		if err != nil {
-			return overflowOffset, err
-		}
-
-		err = binary.Write(writer, order, tag.data)
-		if err != nil {
-			return overflowOffset, err
-		}
-
-		overflowOffset, err = writer.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return overflowOffset, err
-		}
-	} else {
-		err = binary.Write(writer, order, tag.data)
-		if err != nil {
-			return overflowOffset, err
-		}
-	}
-
-	return overflowOffset, nil
+func (tag ShortTag) String() string {
+	return fmt.Sprintf("%s (%d): %s", tagNameMap[tag.ID], tag.ID, tag.ValueAsString())
 }
 
-func (tag *ShortTag) String() string {
-	return fmt.Sprintf("%s (%d): %s", tagNameMap[tag.TagID], tag.TagID, tag.GetValueAsString())
-}
-
-func (tag *ShortTag) GetValueAsString() string {
-	return fmt.Sprint(tag.data)
+func (tag ShortTag) ValueAsString() string {
+	return fmt.Sprint(tag.Data)
 }
 
 // TODO: Check why this order of the member variables works and the other way around doesn't...
@@ -617,7 +419,7 @@ type RationalNumber struct {
 	Numerator   uint32
 }
 
-func (rational *RationalNumber) GetValue() float64 {
+func (rational *RationalNumber) Value() float64 {
 	return float64(rational.Numerator) / float64(rational.Denominator)
 }
 
@@ -671,218 +473,73 @@ func NewRationalNumber(value float64) *RationalNumber {
 }
 
 type RationalTag struct {
-	baseTag
+	ID       TagID
+	DataType DataTypeID
 
-	data []RationalNumber
+	Data []RationalNumber
+}
+
+func (tag RationalTag) TagID() TagID {
+	return tag.ID
 }
 
 // GetNumItems returns the number of items stored in the tag (length of array)
-func (tag *RationalTag) GetNumItems() int {
-	return len(tag.data)
+func (tag RationalTag) NumItems() int {
+	return len(tag.Data)
 }
 
-func (tag *RationalTag) process(tiffFile *File, tagData *tagData) {
-	tag.processBaseTag(tagData)
-	tag.data = make([]RationalNumber, tagData.DataCount)
-
-	// TODO: Do something with the error
-	startLocation, _ := tiffFile.file.Seek(0, io.SeekCurrent)
-	tiffFile.file.Seek(int64(tagData.DataOffset), io.SeekStart)
-	binary.Read(tiffFile.file, tiffFile.header.Endian, &tag.data)
-	// TODO: Do something with the error
-	tiffFile.file.Seek(startLocation, io.SeekStart)
+func (tag RationalTag) String() string {
+	return fmt.Sprintf("%s (%d): %s (%f)", tagNameMap[tag.ID], tag.ID, tag.ValueAsString(), tag.Data[0].Value())
 }
 
-func (tag *RationalTag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, overflowOffset int64) (int64, error) {
-	var err error
-
-	err = tag.writeTagHeader(writer, order)
-	if err != nil {
-		return overflowOffset, err
-	}
-
-	// Write the DataCount
-	err = binary.Write(writer, order, uint32(len(tag.data)))
-	if err != nil {
-		return overflowOffset, err
-	}
-
-	// Must use overflow
-	err = binary.Write(writer, order, uint32(overflowOffset))
-	if err != nil {
-		return 0, err
-	}
-
-	_, err = writer.Seek(overflowOffset, io.SeekStart)
-	if err != nil {
-		return overflowOffset, err
-	}
-
-	err = binary.Write(writer, order, tag.data)
-	if err != nil {
-		return overflowOffset, err
-	}
-
-	overflowOffset, err = writer.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return overflowOffset, err
-	}
-
-	return overflowOffset, nil
-}
-
-func (tag *RationalTag) String() string {
-	return fmt.Sprintf("%s (%d): %s", tagNameMap[tag.TagID], tag.TagID, tag.GetValueAsString())
-}
-
-func (tag *RationalTag) GetValueAsString() string {
-	return fmt.Sprint(tag.data)
+func (tag RationalTag) ValueAsString() string {
+	return fmt.Sprint(tag.Data)
 }
 
 type LongTag struct {
-	baseTag
+	ID       TagID
+	DataType DataTypeID
 
-	data []uint32
+	Data []uint32
 }
 
-// GetNumItems returns the number of items stored in the tag (length of array)
-func (tag *LongTag) GetNumItems() int {
-	return len(tag.data)
+func (tag LongTag) TagID() TagID {
+	return tag.ID
 }
 
-func (tag *LongTag) process(tiffFile *File, tagData *tagData) {
-	tag.processBaseTag(tagData)
-	tag.data = make([]uint32, tagData.DataCount)
-
-	if tagData.DataCount == 1 {
-		tag.data[0] = tagData.DataOffset
-	} else {
-		// TODO: Do something with the error
-		startLocation, _ := tiffFile.file.Seek(0, io.SeekCurrent)
-		tiffFile.file.Seek(int64(tagData.DataOffset), io.SeekStart)
-		binary.Read(tiffFile.file, tiffFile.header.Endian, &tag.data)
-		// TODO: Do something with the error
-		tiffFile.file.Seek(startLocation, io.SeekStart)
-	}
+// NumItems returns the number of items stored in the tag (length of array)
+func (tag LongTag) NumItems() int {
+	return len(tag.Data)
 }
 
-func (tag *LongTag) writeTag(writer io.WriteSeeker, order binary.ByteOrder, overflowOffset int64) (int64, error) {
-	var err error
-
-	err = tag.writeTagHeader(writer, order)
-	if err != nil {
-		return overflowOffset, err
-	}
-
-	// Write the DataCount
-	err = binary.Write(writer, order, uint32(len(tag.data)))
-	if err != nil {
-		return overflowOffset, err
-	}
-
-	if len(tag.data) > 1 {
-		// Must use overflow
-		err = binary.Write(writer, order, uint32(overflowOffset))
-		if err != nil {
-			return 0, err
-		}
-
-		_, err = writer.Seek(overflowOffset, io.SeekStart)
-		if err != nil {
-			return overflowOffset, err
-		}
-
-		err = binary.Write(writer, order, tag.data)
-		if err != nil {
-			return overflowOffset, err
-		}
-
-		overflowOffset, err = writer.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return overflowOffset, err
-		}
-	} else {
-		err = binary.Write(writer, order, tag.data)
-		if err != nil {
-			return overflowOffset, err
-		}
-	}
-
-	return overflowOffset, nil
+func (tag LongTag) String() string {
+	return fmt.Sprintf("%s (%d): %s", tagNameMap[tag.ID], tag.ID, tag.ValueAsString())
 }
 
-func (tag *LongTag) String() string {
-	return fmt.Sprintf("%s (%d): %s", tagNameMap[tag.TagID], tag.TagID, tag.GetValueAsString())
+func (tag LongTag) ValueAsString() string {
+	return fmt.Sprint(tag.Data)
 }
 
-func (tag *LongTag) GetValueAsString() string {
-	return fmt.Sprint(tag.data)
+type Long8Tag struct {
+	ID       TagID
+	DataType DataTypeID
+
+	Data []uint64
 }
 
-// tagData captures the details of a tag as stored in a tiff file.
-type tagData struct {
-	TagID      uint16 /* The tag identifier  */
-	DataType   uint16 /* The scalar type of the data items  */
-	DataCount  uint32 /* The number of items in the tag data  */
-	DataOffset uint32 /* The byte offset to the data items  */
+func (tag Long8Tag) TagID() TagID {
+	return tag.ID
 }
 
-func (ifd *ImageFileDirectory) processTags() error {
-	var err error
-	var tags []tagData
-	tags = make([]tagData, ifd.NumTags)
+// NumItems returns the number of items stored in the tag (length of array)
+func (tag Long8Tag) NumItems() int {
+	return len(tag.Data)
+}
 
-	err = binary.Read(ifd.tiffFile.file, ifd.tiffFile.header.Endian, &tags)
-	if err != nil {
-		return err
-	}
+func (tag Long8Tag) String() string {
+	return fmt.Sprintf("%s (%d): %s", tagNameMap[tag.ID], tag.ID, tag.ValueAsString())
+}
 
-	for _, tag := range tags {
-		tagName := tagNameMap[tagIDMap[tag.TagID]]
-
-		if tagName == "" {
-			fmt.Printf("Unknown tag id %d\n", tag.TagID)
-		} else {
-			dataType := dataTypeMap[tag.DataType]
-
-			//fmt.Println(tagName + ": " + dataTypeNameMap[dataType])
-
-			switch dataType {
-			case Byte:
-				var byteTag ByteTag
-				byteTag.process(ifd.tiffFile, &tag)
-
-				ifd.PutTag(&byteTag)
-			case ASCII:
-				var asciiTag ASCIITag
-				asciiTag.process(ifd.tiffFile, &tag)
-
-				ifd.PutTag(&asciiTag)
-			case Short:
-				var shortTag ShortTag
-				shortTag.process(ifd.tiffFile, &tag)
-
-				ifd.PutTag(&shortTag)
-			case Long:
-				var longTag LongTag
-				longTag.process(ifd.tiffFile, &tag)
-
-				ifd.PutTag(&longTag)
-			case Rational:
-				var rationalTag RationalTag
-				rationalTag.process(ifd.tiffFile, &tag)
-
-				ifd.PutTag(&rationalTag)
-			case Undefined:
-				var byteTag ByteTag
-				byteTag.process(ifd.tiffFile, &tag)
-
-				ifd.PutTag(&byteTag)
-			default:
-				fmt.Printf("Unknown tag type %s\n", dataTypeNameMap[dataTypeMap[tag.DataType]])
-			}
-		}
-	}
-
-	return nil
+func (tag Long8Tag) ValueAsString() string {
+	return fmt.Sprint(tag.Data)
 }

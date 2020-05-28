@@ -1,4 +1,4 @@
-package tiff
+package gobio
 
 import (
 	"bytes"
@@ -24,7 +24,7 @@ type DataAccess interface {
 	GetSamplesPerPixel() uint16
 
 	GetSection(index uint32) *Section
-	GetSectionAt(x, y uint32) *Section
+	GetSectionAt(x, y int64) *Section
 	GetSectionDimensions() (uint32, uint32)
 	GetSectionGrid() (uint32, uint32)
 }
@@ -46,8 +46,8 @@ type baseDataAccess struct {
 	bitsPerSample   []uint16
 	samplesPerPixel uint16
 
-	offsets    []uint32
-	byteCounts []uint32
+	offsets    []int64
+	byteCounts []int64
 }
 
 func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) error {
@@ -74,7 +74,7 @@ func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) 
 		return &FormatError{msg: "BitsPerSample tag appears to be missing"}
 	}
 
-	dataAccess.bitsPerSample = bitsPerSampleTag.data
+	dataAccess.bitsPerSample = bitsPerSampleTag.Data
 
 	createFunction := compressionFuncMap[dataAccess.compressionID]
 	if createFunction != nil {
@@ -97,6 +97,10 @@ func (dataAccess *baseDataAccess) GetTag(tagID TagID) Tag {
 	return dataAccess.ifd.GetTag(tagID)
 }
 
+func (dataAccess *baseDataAccess) GetByteTag(tagID TagID) (*ByteTag, bool) {
+	return dataAccess.ifd.GetByteTag(tagID)
+}
+
 func (dataAccess *baseDataAccess) GetPhotometricInterpretation() PhotometricInterpretationID {
 	return dataAccess.photometricInterpretation
 }
@@ -111,8 +115,11 @@ func (dataAccess *baseDataAccess) GetImageDimensions() (uint32, uint32) {
 
 func (dataAccess *baseDataAccess) GetCompressedData(index uint32) ([]byte, error) {
 	var byteData []byte
+
 	offset := dataAccess.offsets[index]
 	dataSize := dataAccess.byteCounts[index]
+
+	//log.Printf("About to read %d bytes from %d (%d)\n", dataSize, offset, int64(offset))
 
 	byteData = make([]byte, dataSize)
 
@@ -206,8 +213,8 @@ func (dataAccess *StripDataAccess) GetStripDimensions() (uint32, uint32) {
 	return y / dataAccess.rowsPerStrip
 }*/
 
-func (dataAccess *StripDataAccess) GetSectionAt(x uint32, y uint32) *Section {
-	return dataAccess.GetSection(y / dataAccess.rowsPerStrip)
+func (dataAccess *StripDataAccess) GetSectionAt(x int64, y int64) *Section {
+	return dataAccess.GetSection(uint32(y / int64(dataAccess.rowsPerStrip)))
 }
 
 func (dataAccess *StripDataAccess) GetSection(index uint32) *Section {
@@ -326,10 +333,10 @@ func (dataAccess *TileDataAccess) GetTileGrid() (uint32, uint32) {
 }*/
 
 // GetSectionAt returns the section at the specified pixel coordinate
-func (dataAccess *TileDataAccess) GetSectionAt(x uint32, y uint32) *Section {
-	index := (y/dataAccess.tileLength)*dataAccess.tilesAcross + (x / dataAccess.tileWidth)
+func (dataAccess *TileDataAccess) GetSectionAt(x int64, y int64) *Section {
+	index := (y/int64(dataAccess.tileLength))*int64(dataAccess.tilesAcross) + (x / int64(dataAccess.tileWidth))
 
-	return dataAccess.GetSection(index)
+	return dataAccess.GetSection(uint32(index))
 }
 
 func (dataAccess *TileDataAccess) GetSection(index uint32) *Section {

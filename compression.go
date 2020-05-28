@@ -1,11 +1,12 @@
-package tiff
+package gobio
 
 import (
 	"bufio"
 	"bytes"
-	"compress/lzw"
 	"io"
 	"io/ioutil"
+
+	"golang.org/x/image/tiff/lzw"
 
 	"github.com/AlanRace/go-bio/jpeg"
 )
@@ -52,12 +53,12 @@ func init() {
 	})
 	AddCompression(JPEG, "JPEG", func(dataAccess TagAccess) (CompressionMethod, error) {
 		if dataAccess.GetTag(JPEGTables) != nil {
-			tablesTag, ok := dataAccess.GetTag(JPEGTables).(*ByteTag)
+			tablesTag, ok := dataAccess.GetByteTag(JPEGTables) //.(*ByteTag)
 			if !ok {
 				return nil, &FormatError{msg: "JPEGTables not recorded as byte"}
 			}
 
-			r := bytes.NewReader(tablesTag.data)
+			r := bytes.NewReader(tablesTag.Data)
 
 			header, err := jpeg.DecodeHeader(r)
 			if err != nil {

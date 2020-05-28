@@ -1,8 +1,9 @@
-package tiff
+package gobio
 
 import (
 	"fmt"
 	"image"
+	"image/draw"
 	"image/png"
 	"log"
 	"os"
@@ -13,7 +14,9 @@ func TestLoad(t *testing.T) {
 	//filename := "X:\\CRUK\\UnifiedWorkflowStudy\\AZ\\OI_from left_136,146.svs"
 	//filename := "C:\\Work\\PuffPiece\\20191128_3Dunified_blueset_set7_orbisims_307_downsampled3x.tif"
 	//filename := "C:\\Work\\Registration\\20151030_PDAC_set2_neg_80um_s66_Ivis_Lab_10x.tif"
-	filename := "C:\\Work\\AZ\\Stephanie\\20190913_CKD_Adenosine_CXCR2_DESIpos_30um_slide19_Section 09\\meanImage_cluster48.tif"
+	//filename := "C:\\Work\\AZ\\Stephanie\\20190913_CKD_Adenosine_CXCR2_DESIpos_30um_slide19_Section 09\\meanImage_cluster48.tif"
+	//filename := "C:\\Work\\AZ\\Stephanie\\S.Ling H&E 5_09_b.tif"
+	filename := "D:\\AZ\\Gemcitabine\\GEMTAB_Scan1.qptiff"
 
 	tiffFile, err := Open(filename)
 	if err != nil {
@@ -22,12 +25,15 @@ func TestLoad(t *testing.T) {
 	defer tiffFile.Close()
 
 	ifdIndex := 0 //len(tiffFile.IFDList) - 2
-	//ifdIndex = 5
+	ifdIndex = 20
 
 	//fmt.Println(tiffFile)
 	//tiffFile.IFDList[ifdIndex].PrintMetadata()
 
 	fmt.Println(tiffFile.IFDList[ifdIndex].GetImageDimensions())
+	fmt.Printf("IsReducedResolutionImage? %v\n", tiffFile.IFDList[ifdIndex].IsReducedResolutionImage())
+	compression, _ := tiffFile.IFDList[ifdIndex].GetCompression()
+	fmt.Printf("Compression? %v\n", compression)
 	//	fmt.Println(tiffFile.IFDList[ifdIndex].GetResolution())
 
 	ifd := tiffFile.IFDList[ifdIndex]
@@ -56,29 +62,48 @@ func TestLoad(t *testing.T) {
 	png.Encode(f, img)
 
 	// Check can output whole file
-	data = nil
+	//	data = nil
 
-	gridX, gridY := ifd.GetSectionGrid()
-	fmt.Printf("Found grid dimensions: %d x %d\n", gridX, gridY)
-
-	for y := uint32(0); y < gridY; y++ {
-		for x := uint32(0); x < gridX; x++ {
-			section := ifd.GetSection(y*gridX + x)
-
-			rgbaData, err := section.GetRGBAData()
-			if err != nil {
-				panic(err)
-			}
-
-			data = append(data, rgbaData...)
-		}
-	}
-
-	fmt.Printf("Loaded data with length %d\n", len(data))
 	width, height := ifd.GetImageDimensions()
 
 	img = image.NewRGBA(image.Rect(0, 0, int(width), int(height)))
-	img.Pix = data
+
+	gridX, gridY := ifd.GetSectionGrid()
+	fmt.Printf("Found grid dimensions: %d x %d (%d x %d)\n", gridX, gridY, width, height)
+
+	curY := 0
+	for y := uint32(0); y < gridY; y++ {
+		curX := 0
+		for x := uint32(0); x < gridX; x++ {
+			section := ifd.GetSection(y*gridX + x)
+
+			fmt.Printf("Found section dimensions (%d, %d): %d x %d\n", x, y, int(section.Width), int(section.Height))
+			sectionImage := image.NewRGBA(image.Rect(0, 0, int(section.Width), int(section.Height)))
+
+			rgbaData, err := section.GetRGBAData()
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+
+			if len(rgbaData) < int(section.Width)*int(section.Height)*4 {
+				fmt.Printf("[Skipping]==> %d\n", len(rgbaData))
+				continue
+			}
+
+			sectionImage.Pix = rgbaData
+
+			draw.Draw(img, image.Rect(curX, curY, curX+int(section.Width), curY+int(section.Height)), sectionImage, image.Point{0, 0}, draw.Src)
+			//data = append(data, rgbaData...)
+
+			curX += int(section.Width)
+		}
+		curY += int(section.Height)
+	}
+
+	fmt.Printf("Loaded data with length %d\n", len(data))
+
+	//img.Pix = data
 
 	f, err = os.Create("full.png")
 	if err != nil {
