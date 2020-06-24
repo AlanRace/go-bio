@@ -234,7 +234,9 @@ func (dataAccess *StripDataAccess) GetSection(index uint32) *Section {
 
 	if section.Y == dataAccess.stripsInImage-1 {
 		section.Height = dataAccess.imageLength % dataAccess.rowsPerStrip
-	} else {
+	}
+
+	if section.Height == 0 {
 		section.Height = dataAccess.rowsPerStrip
 	}
 

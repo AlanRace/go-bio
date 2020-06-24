@@ -2,6 +2,7 @@ package qptiff
 
 import (
 	"encoding/xml"
+	"fmt"
 	"strings"
 
 	tiff "github.com/AlanRace/go-bio"
@@ -95,7 +96,7 @@ func Open(path string) (*File, error) {
 		imageDetailsTag, ok := ifd.Tags[tiff.ImageDescription].(*tiff.ASCIITag)
 
 		if !ok {
-			return nil, &FormatError{msg: "ImageDescription is not ASCII type"}
+			return nil, &FormatError{msg: fmt.Sprintf("ImageDescription is not ASCII type: %v", ifd.Tags[tiff.ImageDescription])}
 		}
 
 		imageDetailsString := imageDetailsTag.ValueAsString()

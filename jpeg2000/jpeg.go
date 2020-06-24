@@ -13,6 +13,15 @@ import (
 	"golang.org/x/text/encoding/charmap"
 )
 
+// Implementations
+//https://github.com/jai-imageio/jai-imageio-jpeg2000
+//https://github.com/mozilla/pdf.js/blob/master/src/core/jpx.js
+
+//https://github.com/mdadams/jasper
+//https://github.com/uclouvain/openjpeg
+//https://code.google.com/archive/p/jj2000/
+//https://github.com/Unidata/jj2000
+
 const (
 	Marker uint8 = 0xff
 	// Delimiting markers and marker segments

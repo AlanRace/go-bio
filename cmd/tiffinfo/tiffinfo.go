@@ -8,13 +8,13 @@ import (
 	tiff "github.com/AlanRace/go-bio"
 
 	// Make sure that we include SVS package so we correctly handle SVS files
-	"github.com/AlanRace/go-bio/qptiff"
+
 	_ "github.com/AlanRace/go-bio/svs"
 )
 
 func main() {
 	if len(os.Args) > 1 {
-		file, err := qptiff.Open(os.Args[1])
+		file, err := tiff.Open(os.Args[1])
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -99,7 +99,12 @@ func main() {
 				fmt.Printf("Tiles: %d x %d\n", tileWidth, tileHeight)
 			}*/
 
+			section := ifd.GetSection(0)
+
+			fmt.Printf("Size of data: %v\n", section)
+
 			fmt.Println()
 		}
+
 	}
 }
