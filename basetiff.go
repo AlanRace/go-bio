@@ -148,7 +148,10 @@ func Open(location string) (*File, error) {
 		}
 
 		ifd.tiffFile = &tiffFile
-		ifd.setUpDataAccess()
+		err = ifd.setUpDataAccess()
+		if err != nil {
+			return nil, err
+		}
 
 		tiffFile.IFDList = append(tiffFile.IFDList, ifd)
 
@@ -359,13 +362,14 @@ func (ifd *ImageFileDirectory) GetImageDimensions() (uint32, uint32) {
 	return ifd.GetLongTagValue(ImageWidth), ifd.GetLongTagValue(ImageLength)
 }
 
+// GetResolution returns the size of a pixel in x and y and the associated unit
 func (ifd *ImageFileDirectory) GetResolution() (float64, float64, ResolutionUnitID, error) {
 	resoutionUnit, err := ifd.GetResolutionUnit()
 	if err != nil {
 		return 0.0, 0.0, 0, err
 	}
 
-	return ifd.GetRationalTagValue(XResolution), ifd.GetRationalTagValue(YResolution), resoutionUnit, nil
+	return 1.0 / ifd.GetRationalTagValue(XResolution), 1.0 / ifd.GetRationalTagValue(YResolution), resoutionUnit, nil
 }
 
 func (ifd *ImageFileDirectory) GetBitsPerSample() (uint16, error) {

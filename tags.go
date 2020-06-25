@@ -415,8 +415,8 @@ func (tag ShortTag) ValueAsString() string {
 
 // TODO: Check why this order of the member variables works and the other way around doesn't...
 type RationalNumber struct {
-	Denominator uint32
 	Numerator   uint32
+	Denominator uint32
 }
 
 func (rational *RationalNumber) Value() float64 {

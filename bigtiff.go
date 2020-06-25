@@ -81,7 +81,7 @@ func processBigTags(ifd *ImageFileDirectory, seeker io.ReadSeeker, endian binary
 		tagName := TagNameFromID(tag.TagID) //tagNameMap[tagIDMap[tag.TagID]]
 
 		if tagName == "" {
-			fmt.Printf("Unknown tag id %d\n", tag.TagID)
+			log.Printf("Unknown tag id %d\n", tag.TagID)
 		} else {
 			dataType := DataTypeFromID(tag.DataType)
 
@@ -114,7 +114,7 @@ func processBigTags(ifd *ImageFileDirectory, seeker io.ReadSeeker, endian binary
 
 				ifd.PutTag(long8Tag)
 			default:
-				fmt.Printf("Unknown tag type %s\n", DataTypeNameFromID(tag.DataType))
+				log.Printf("Unknown tag type %s\n", DataTypeNameFromID(tag.DataType))
 			}
 		}
 	}

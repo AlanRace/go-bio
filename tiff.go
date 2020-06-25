@@ -2,7 +2,6 @@ package gobio
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 	"log"
 )
@@ -87,7 +86,7 @@ func processTags(ifd *ImageFileDirectory, seeker io.ReadSeeker, endian binary.By
 		tagName := TagNameFromID(tag.TagID) //tagNameMap[tagIDMap[tag.TagID]]
 
 		if tagName == "" {
-			fmt.Printf("Unknown tag id %d\n", tag.TagID)
+			log.Printf("Unknown tag id %d\n", tag.TagID)
 		} else {
 			dataType := DataTypeFromID(tag.DataType)
 
@@ -115,7 +114,7 @@ func processTags(ifd *ImageFileDirectory, seeker io.ReadSeeker, endian binary.By
 
 				ifd.PutTag(rationalTag)
 			default:
-				fmt.Printf("Unknown tag type %s\n", DataTypeNameFromID(tag.DataType))
+				log.Printf("Unknown tag type %s\n", DataTypeNameFromID(tag.DataType))
 			}
 		}
 	}
