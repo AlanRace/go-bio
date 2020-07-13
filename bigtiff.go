@@ -2,7 +2,6 @@ package gobio
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 	"log"
 )
