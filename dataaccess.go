@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"image"
+	"image/color"
 	"io"
 	"sync"
 )
@@ -179,6 +180,21 @@ func (dataAccess *baseDataAccess) createImage(fullData []byte) (image.Image, err
 			data[i*4] = fullData[i*3]
 			data[i*4+1] = fullData[i*3+1]
 			data[i*4+2] = fullData[i*3+2]
+			data[i*4+3] = 255
+		}
+
+		rgbImg.Pix = data
+
+		img = rgbImg
+	case YCbCr:
+		rgbImg := image.NewRGBA(image.Rect(0, 0, int(dataAccess.imageWidth), int(dataAccess.imageLength)))
+		data := make([]byte, len(fullData)/3*4)
+
+		for i := 0; i < len(data)/4; i++ {
+			r, g, b := color.YCbCrToRGB(fullData[i*3], fullData[i*3+1], fullData[i*3+2])
+			data[i*4] = r
+			data[i*4+1] = g
+			data[i*4+2] = b
 			data[i*4+3] = 255
 		}
 
@@ -422,6 +438,20 @@ func (section *Section) GetData() ([]byte, error) {
 	return section.dataAccess.GetData(section.Index)
 }
 
+func (section *Section) GetImage() (image.Image, error) {
+	w, h := section.dataAccess.GetSectionDimensions()
+
+	img := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
+	data, err := section.GetRGBAData()
+	if err != nil {
+		return nil, err
+	}
+
+	img.Pix = data
+
+	return img, nil
+}
+
 func (section *Section) GetRGBData() ([]byte, error) {
 	rawData, err := section.GetData()
 
@@ -434,6 +464,28 @@ func (section *Section) GetRGBData() ([]byte, error) {
 		// TODO: check if the data is interlieved
 		// TODO: check if data has 4 SamplesPerPixel
 
+		return rawData, nil
+	case YCbCr: /*
+			//fmt.Printf("HI!%d\n", len(rawData))
+			w, h := section.dataAccess.GetSectionDimensions()
+
+			for i := 0; i < len(rawData)/3; i++ {
+				y := i / int(w)
+				x := i - (y * int(w))
+
+				//fmt.Printf("(%d, %d) [%d x %d]\n", x, y, w, h)
+				x /= 2
+				y /= 2
+
+				index := (y * int(w)) + x
+
+				//fmt.Printf("(%d, %d) [%d / %d] {%d %d %d}\n", x, y, index, i, rawData[index*3], rawData[i*3+1], rawData[i*3+2])
+
+				//r, g, b := color.YCbCrToRGB(rawData[index*3], rawData[index*3+1], rawData[index*3+2])
+				/*rawData[i*3] = rawData[i*3]
+				rawData[i*3+1] = rawData[i*3+1]
+				rawData[i*3+2] = rawData[i*3+2]
+			}*/
 		return rawData, nil
 	default:
 		return nil, &FormatError{msg: "Unsupported PhotometricInterpretation: " + photometricInterpretationNameMap[section.dataAccess.GetPhotometricInterpretation()]}

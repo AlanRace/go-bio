@@ -10,3 +10,9 @@
 *.bin
 
 *.out
+
+libjpeg/test/out/.keep
+
+libjpeg/test/out/
+
+cmd/tiffinfo/tiffinfo
