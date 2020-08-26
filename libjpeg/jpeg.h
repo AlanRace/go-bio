@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <setjmp.h>
-#include "jpeglib.h"
-#include "jerror.h"
+#include <jpeglib.h>
+#include <jerror.h>
 
 // the dimension multiple to which data buffers should be aligned.
 #define ALIGN_SIZE 16

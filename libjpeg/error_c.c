@@ -1,7 +1,7 @@
 #ifndef __INTELLISENSE__
 #include "_cgo_export.h"
 #endif
-#include "jpeg.h"
+#include <jpeg.h>
 
 /* must not return */
 void error_longjmp(j_common_ptr cinfo) {

@@ -3,7 +3,7 @@ package libjpeg
 /*
 #include <stdio.h>
 #include <stdlib.h>
-#include "jpeglib.h"
+#include <jpeglib.h>
 
 // export from golang
 void goPanic(char*);

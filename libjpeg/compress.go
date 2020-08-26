@@ -3,8 +3,8 @@ package libjpeg
 /*
 #include <stdio.h>
 #include <stdlib.h>
-#include "jpeglib.h"
-#include "jpeg.h"
+#include <jpeglib.h>
+#include <jpeg.h>
 
 static struct jpeg_compress_struct *new_compress(void) {
 	struct jpeg_compress_struct *cinfo = (struct jpeg_compress_struct *) calloc(sizeof(struct jpeg_compress_struct), 1);

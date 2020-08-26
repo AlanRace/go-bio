@@ -3,7 +3,7 @@ package libjpeg
 /*
 #include <stdio.h>
 #include <stdlib.h>
-#include "jpeglib.h"
+#include <jpeglib.h>
 
 static void error_message(j_common_ptr cinfo, char *buf, size_t capa) {
 	if (cinfo != NULL && cinfo->err != NULL) {

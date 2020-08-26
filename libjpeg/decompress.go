@@ -3,8 +3,8 @@ package libjpeg
 /*
 #include <stdio.h>
 #include <stdlib.h>
-#include "jpeglib.h"
-#include "jerror.h"
+#include <jpeglib.h>
+#include <jerror.h>
 #include "jpeg.h"
 
 void error_panic(j_common_ptr dinfo);
