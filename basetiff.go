@@ -177,7 +177,7 @@ func Open(location string) (*File, error) {
 	return &tiffFile, nil
 }
 
-func (file File) NumResolutions() int {
+func (file File) NumReducedImages() int {
 	numRes := 1
 
 	for i := 1; i < len(file.IFDList); i++ {
@@ -187,6 +187,25 @@ func (file File) NumResolutions() int {
 	}
 
 	return numRes
+}
+
+func (file File) GetReducedImage(index int) *ImageFileDirectory {
+	if index == 0 {
+		return file.IFDList[0]
+	}
+
+	curIndex := 0
+	for i := 1; i < len(file.IFDList); i++ {
+		if file.IFDList[i].IsReducedResolutionImage() {
+			curIndex++
+		}
+
+		if curIndex == index {
+			return file.IFDList[i]
+		}
+	}
+
+	return nil
 }
 
 // func Open(path string) (File, error) {

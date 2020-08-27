@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	YCbCrJPEG tiff.CompressionID = 33003
-	RGBJPEG   tiff.CompressionID = 33005
+	//YCbCrJPEG tiff.CompressionID = 33003
+	//RGBJPEG   tiff.CompressionID = 33005
 
 	ImageDepth tiff.TagID = 32997
 )
@@ -57,9 +57,9 @@ type File struct {
 
 func init() {
 	tiff.AddTag(ImageDepth, "ImageDepth")
-	tiff.AddCompression(RGBJPEG, "JPEG (Aperio RGB)", func(dataAccess tiff.TagAccess) (tiff.CompressionMethod, error) {
-		return &RGBJPEGCompression{}, nil
-	})
+	//tiff.AddCompression(RGBJPEG, "JPEG (Aperio RGB)", func(dataAccess tiff.TagAccess) (tiff.CompressionMethod, error) {
+	//	return &RGBJPEGCompression{}, nil
+	//})
 }
 
 func Open(path string) (*File, error) {
@@ -72,4 +72,16 @@ func Open(path string) (*File, error) {
 	svsFile.File = *tiffFile
 
 	return &svsFile, nil
+}
+
+func (file File) NumResolutions() int {
+	return 4
+}
+
+func (file File) GetReducedImage(index int) *tiff.ImageFileDirectory {
+	if index == 0 {
+		return file.IFDList[0]
+	}
+
+	return file.IFDList[index+1]
 }
