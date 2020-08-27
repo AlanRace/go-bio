@@ -158,10 +158,12 @@ import (
 	"image"
 	"image/color"
 	"io"
+	"sync"
 	"unsafe"
 )
 
 type JPEG struct {
+	mux   sync.Mutex
 	dinfo *C.struct_jpeg_decompress_struct
 
 	colourSpace C.J_COLOR_SPACE
@@ -199,6 +201,9 @@ func (j *JPEG) Destroy() {
 
 // DecodeBody decodes from io.Reader, using pre-defined header information (Quantization tables, colour space)
 func (j *JPEG) DecodeBody(r io.Reader) (dest image.Image, err error) {
+	j.mux.Lock()
+	defer j.mux.Unlock()
+
 	dinfo := C.new_decompress()
 	defer destroyDecompress(dinfo)
 
@@ -237,6 +242,7 @@ func (j *JPEG) DecodeBody(r io.Reader) (dest image.Image, err error) {
 	default:
 		return nil, fmt.Errorf("unsupported number of components: %d", dinfo.num_components)
 	}
+
 	return
 }
 
