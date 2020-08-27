@@ -1,8 +1,8 @@
-// Package jpeg decodes JPEG image to image.YCbCr using libjpeg (or libjpeg-turbo).
+// Package libjpeg decodes JPEG image to image.YCbCr using libjpeg (or libjpeg-turbo).
 package libjpeg
 
 //
-// Original codes are bollowed from go-thumber.
+// Original codes are borrowed from go-thumber.
 // Copyright (c) 2014 pixiv Inc. All rights reserved.
 //
 // See: https://github.com/pixiv/go-thumber

@@ -165,6 +165,8 @@ import (
 
 type JPEG struct {
 	dinfo *C.struct_jpeg_decompress_struct
+
+	colourSpace C.J_COLOR_SPACE
 }
 
 func NewJPEGFromHeader(r io.Reader) (*JPEG, error) {
@@ -183,10 +185,21 @@ func NewJPEGFromHeader(r io.Reader) (*JPEG, error) {
 	return &j, nil
 }
 
+// RGBColourSpace sets the colour space for decoding to be RGB
+func (j *JPEG) RGBColourSpace() {
+	j.colourSpace = C.JCS_RGB
+}
+
+// YCbCrColourSpace sets the colour space for decoding to be YCbCr
+func (j *JPEG) YCbCrColourSpace() {
+	j.colourSpace = C.JCS_YCbCr
+}
+
 func (j *JPEG) Destroy() {
 	destroyDecompress(j.dinfo)
 }
 
+// DecodeBody decodes from io.Reader, using pre-defined header information (Quantization tables, colour space)
 func (j *JPEG) DecodeBody(r io.Reader) (dest image.Image, err error) {
 	dinfo := C.new_decompress()
 	defer destroyDecompress(dinfo)
@@ -202,6 +215,11 @@ func (j *JPEG) DecodeBody(r io.Reader) (dest image.Image, err error) {
 	}
 
 	setupDecoderOptions(dinfo, &DecoderOptions{})
+
+	// Override the colour space if colour space set in header
+	if j.colourSpace != 0 {
+		dinfo.jpeg_color_space = j.colourSpace
+	}
 
 	switch dinfo.num_components {
 	case 1:

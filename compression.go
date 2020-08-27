@@ -91,6 +91,7 @@ type BinaryDecompressor interface {
 type ImageDecompressor interface {
 	CompressionMethod
 	Decompress(io.Reader) (image.Image, error)
+	SetPhotometricInterpretation(interpretation PhotometricInterpretationID)
 }
 
 // NoCompression performs no decompression of data.
@@ -181,6 +182,17 @@ type JPEGCompression struct {
 // Decompress decompresses an io.Reader using the JPEG algorithm.
 func (compression *JPEGCompression) Decompress(r io.Reader) (image.Image, error) {
 	return compression.ljpeg.DecodeBody(r)
+}
+
+func (compression *JPEGCompression) SetPhotometricInterpretation(interpretation PhotometricInterpretationID) {
+	switch interpretation {
+	case RGB:
+		compression.ljpeg.RGBColourSpace()
+	case YCbCr:
+		compression.ljpeg.YCbCrColourSpace()
+	default:
+		panic("Unsupported photometric interpretation !" + interpretation.String())
+	}
 }
 
 // Decompress decompresses the data supplied in the io.Reader using the compression method dictated by CompressionID.
