@@ -177,6 +177,14 @@ func Open(location string) (*File, error) {
 	return &tiffFile, nil
 }
 
+func (file File) GetIFDList() []*ImageFileDirectory {
+	return file.IFDList
+}
+
+func (file File) GetIFD(index int) *ImageFileDirectory {
+	return file.IFDList[index]
+}
+
 func (file File) NumReducedImages() int {
 	numRes := 1
 
