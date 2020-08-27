@@ -74,8 +74,8 @@ func Open(path string) (*File, error) {
 	return &svsFile, nil
 }
 
-func (file File) NumResolutions() int {
-	return 4
+func (file File) NumReducedImages() int {
+	return 5
 }
 
 func (file File) GetReducedImage(index int) *tiff.ImageFileDirectory {
@@ -83,5 +83,11 @@ func (file File) GetReducedImage(index int) *tiff.ImageFileDirectory {
 		return file.IFDList[0]
 	}
 
+	// The second image in the list is the lowest resolution image
+	if index == 4 {
+		return file.IFDList[1]
+	}
+
+	// Otherwise, they are in descending order
 	return file.IFDList[index+1]
 }
