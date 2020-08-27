@@ -84,6 +84,9 @@ type ImageFileDirectory struct {
 
 	getStripOffsets func(*ImageFileDirectory) ([]int64, []int64, error)
 	getTileOffsets  func(*ImageFileDirectory) ([]int64, []int64, error)
+
+	PixelSizeXUm float64
+	PixelSizeYUm float64
 }
 
 func Open(location string) (*File, error) {

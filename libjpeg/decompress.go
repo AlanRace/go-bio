@@ -220,6 +220,8 @@ func (j *JPEG) DecodeBody(r io.Reader) (dest image.Image, err error) {
 	setupDecoderOptions(dinfo, &DecoderOptions{})
 
 	// Override the colour space if colour space set in header
+	// TODO: Think of a better way to do this. This is necessary for SVS images, but
+	// is likely to mess up other images.
 	if j.colourSpace != 0 {
 		dinfo.jpeg_color_space = j.colourSpace
 	}
@@ -238,6 +240,13 @@ func (j *JPEG) DecodeBody(r io.Reader) (dest image.Image, err error) {
 			dest, err = decodeRGB(dinfo)
 		default:
 			return nil, errors.New("unsupported colorspace")
+		}
+	case 4:
+		switch dinfo.jpeg_color_space {
+		case C.JCS_RGB, C.JCS_CMYK:
+			// Likely that this was incorrectly overridden, so change back
+			dinfo.jpeg_color_space = C.JCS_CMYK
+			dest, err = decodeCMYK(dinfo)
 		}
 	default:
 		return nil, fmt.Errorf("unsupported number of components: %d", dinfo.num_components)
@@ -371,7 +380,7 @@ func Decode(r io.Reader, options *DecoderOptions) (dest image.Image, err error) 
 			return nil, errors.New("unsupported colorspace")
 		}
 	default:
-		return nil, fmt.Errorf("unsupported number of components: %d", dinfo.num_components)
+		return nil, fmt.Errorf("(Decode) Unsupported number of components: %d", dinfo.num_components)
 	}
 	return
 }
@@ -500,14 +509,27 @@ func readRGBScanlines(dinfo *C.struct_jpeg_decompress_struct, dest *image.RGBA, 
 				dest.Pix[startingIndex+i*4+2] = tempBuff[i*3+2]
 				dest.Pix[startingIndex+i*4+3] = 255
 			}
+		} else if dinfo.num_components == 4 {
+			for i := 0; i < len(tempBuff); i++ {
+				dest.Pix[startingIndex+i] = tempBuff[i]
+			}
 		} else {
-			return fmt.Errorf("Unsupported number of components when readRGBScanlines")
+			return fmt.Errorf("[readRGBScanlines] Unsupported number of components when readRGBScanlines")
 		}
 	}
 	return
 }
 
-// TODO: supports decoding into image.RGBA instead of rgb.Image.
+func decodeCMYK(dinfo *C.struct_jpeg_decompress_struct) (dest *image.RGBA, err error) {
+	C.jpeg_calc_output_dimensions(dinfo)
+	//dest = rgb.NewImage(image.Rect(0, 0, int(dinfo.output_width), int(dinfo.output_height)))
+	dest = image.NewRGBA(image.Rect(0, 0, int(dinfo.output_width), int(dinfo.output_height)))
+
+	dinfo.out_color_space = C.JCS_CMYK
+	err = readRGBScanlines(dinfo, dest, dest.Stride)
+	return
+}
+
 func decodeRGB(dinfo *C.struct_jpeg_decompress_struct) (dest *image.RGBA, err error) {
 	C.jpeg_calc_output_dimensions(dinfo)
 	//dest = rgb.NewImage(image.Rect(0, 0, int(dinfo.output_width), int(dinfo.output_height)))

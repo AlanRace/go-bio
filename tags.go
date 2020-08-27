@@ -2,6 +2,7 @@ package gobio
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 )
@@ -419,6 +420,17 @@ type ShortTag struct {
 	Data []uint16
 }
 
+func NewShortTag(tagID TagID, data []uint16) *ShortTag {
+	var tag ShortTag
+
+	tag.ID = tagID
+	tag.DataType = Short
+
+	tag.Data = data
+
+	return &tag
+}
+
 func (tag ShortTag) TagID() TagID {
 	return tag.ID
 }
@@ -448,18 +460,82 @@ func (rational *RationalNumber) Value() float64 {
 
 func NewRationalNumber(value float64) *RationalNumber {
 	var newRat RationalNumber
-	var a, b, c, d int
+	//https://rosettacode.org/wiki/Convert_decimal_number_to_rational#C
+	/*  a: continued fraction coefficients. */
+	var a, x, d, n int64
+	h := []int64{0, 1, 0}
+	k := []int64{1, 0, 0}
+
+	n = 1
+	var i int
+
+	md := int64(2 ^ 32)
+
+	//if (md <= 1) { *denom = 1; *num = (int64_t) f; return; }
+
+	// TODO: Don't need negative for now
+	//if (f < 0) { neg = 1; f = -f; }
+
+	for value != math.Floor(value) {
+		n <<= 1
+		value *= 2
+	}
+
+	d = int64(value)
+
+	/* continued fraction and check denominator each step */
+	for i = 0; i < 64; i++ {
+		if n > 0 {
+			a = d / n
+		} else {
+			a = 0
+		}
+		//a = n ? d / n : 0;
+		if i > 0 && a == 0 {
+			break
+		}
+
+		x = d
+		d = n
+		n = x % n
+
+		x = a
+		if k[1]*a+k[0] >= md {
+			x = (md - k[0]) / k[1]
+			if x*2 >= a || k[1] >= md {
+				i = 65
+			} else {
+				break
+			}
+		}
+
+		h[2] = x*h[1] + h[0]
+		h[0] = h[1]
+		h[1] = h[2]
+		k[2] = x*k[1] + k[0]
+		k[0] = k[1]
+		k[1] = k[2]
+	}
+	//*denom = k[1];
+	//*num = neg ? -h[1] : h[1];
+
+	newRat.Denominator = uint32(k[1])
+	newRat.Numerator = uint32(h[1])
+
+	return &newRat
+
+	/*var a, b, c, d float64
 	a = 0
 	b = 1
-	c = 1
+	c = value * 100
 	d = 1
 
 	maxVal := 2 ^ 32
 
-	for b < maxVal && d < maxVal {
+	for int(b) < maxVal && int(d) < maxVal {
 		mediant := float64(a+c) / float64(b+d)
 		if value == mediant {
-			if b+d < maxVal {
+			if int(b)+int(d) < maxVal {
 				newRat.Numerator = uint32(a + c)
 				newRat.Denominator = uint32(b + d)
 
@@ -492,7 +568,7 @@ func NewRationalNumber(value float64) *RationalNumber {
 		newRat.Denominator = uint32(b)
 	}
 
-	return &newRat
+	return &newRat*/
 }
 
 type RationalTag struct {
@@ -500,6 +576,17 @@ type RationalTag struct {
 	DataType DataTypeID
 
 	Data []RationalNumber
+}
+
+func NewRationalTag(tagID TagID, data []RationalNumber) *RationalTag {
+	var tag RationalTag
+
+	tag.ID = tagID
+	tag.DataType = Rational
+
+	tag.Data = data
+
+	return &tag
 }
 
 func (tag RationalTag) TagID() TagID {
