@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"image"
-	"image/color"
 	"io"
 	"sync"
 )
@@ -18,8 +17,9 @@ type DataAccess interface {
 	//GetDataIndexAt(x uint32, y uint32) uint32
 	GetCompressedData(index uint32) ([]byte, error)
 	GetData(index uint32) ([]byte, error)
-	GetFullData() ([]byte, error)
-	GetImage() (image.Image, error)
+	GetImage(index uint32) (image.Image, error)
+
+	//GetFullData() ([]byte, error)
 
 	GetPhotometricInterpretation() PhotometricInterpretationID
 	GetSamplesPerPixel() uint16
@@ -114,6 +114,7 @@ func (dataAccess *baseDataAccess) GetImageDimensions() (uint32, uint32) {
 	return dataAccess.imageWidth, dataAccess.imageLength
 }
 
+// GetCompressedData returns the data as it is found in the file, without decompression
 func (dataAccess *baseDataAccess) GetCompressedData(index uint32) ([]byte, error) {
 	var byteData []byte
 
@@ -141,14 +142,21 @@ func (dataAccess *baseDataAccess) GetCompressedData(index uint32) ([]byte, error
 }
 
 func (dataAccess *baseDataAccess) GetData(index uint32) ([]byte, error) {
-	var r io.Reader
-	byteData, err := dataAccess.GetCompressedData(index)
-	if err != nil {
-		return nil, err
-	}
-	r = bytes.NewReader(byteData)
+	switch compression := dataAccess.compression.(type) {
+	case BinaryDecompressor:
+		var r io.Reader
+		byteData, err := dataAccess.GetCompressedData(index)
+		if err != nil {
+			return nil, err
+		}
+		r = bytes.NewReader(byteData)
 
-	return dataAccess.compression.Decompress(r)
+		return compression.Decompress(r)
+	case NoCompression:
+		return dataAccess.GetCompressedData(index)
+	default:
+		return nil, fmt.Errorf("Can't use GetData when compression type is %T. Use GetImage instead", compression)
+	}
 }
 
 func (dataAccess *baseDataAccess) PixelSizeInBytes() uint32 {
@@ -168,7 +176,63 @@ func (dataAccess *baseDataAccess) ImageSizeInBytes() uint32 {
 	return dataAccess.imageWidth * dataAccess.imageLength * dataAccess.PixelSizeInBytes()
 }
 
-func (dataAccess *baseDataAccess) createImage(fullData []byte) (image.Image, error) {
+type subImager interface {
+	SubImage(r image.Rectangle) image.Image
+}
+
+// GetImage returns an image for the section at the specified index. If the compression can decompress to an image directly,
+// this is returned (after cropping to the size of the section). If compression only supports binary, then the PhotometricInterpretation
+// in the tiff header is taken into account.
+func (dataAccess baseDataAccess) GetImage(index uint32) (image.Image, error) {
+	switch compression := dataAccess.compression.(type) {
+	case ImageDecompressor:
+		var r io.Reader
+		byteData, err := dataAccess.GetCompressedData(index)
+		if err != nil {
+			return nil, err
+		}
+		r = bytes.NewReader(byteData)
+
+		img, err := compression.Decompress(r)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if img.Bounds().Max.X == int(dataAccess.imageWidth) && img.Bounds().Max.Y == int(dataAccess.imageLength) {
+			return img, nil
+		}
+
+		simg, ok := img.(subImager)
+		if !ok {
+			return nil, fmt.Errorf("Image section at index %d is not same size as section and cannot be cropped", index)
+		}
+
+		return simg.SubImage(image.Rect(0, 0, int(dataAccess.imageWidth), int(dataAccess.imageLength))), nil
+
+	default:
+		switch dataAccess.GetPhotometricInterpretation() {
+		case RGB:
+			w, h := int(dataAccess.imageWidth), int(dataAccess.imageLength) //dataAccess.GetSectionDimensions()
+
+			img := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
+			// TODO: Should this be GetRGBA data?
+			data, err := dataAccess.GetData(index)
+			if err != nil {
+				return nil, err
+			}
+
+			img.Pix = data
+			return img, nil
+		default:
+			return nil, &FormatError{msg: "Unsupported PhotometricInterpretation: " + photometricInterpretationNameMap[dataAccess.GetPhotometricInterpretation()]}
+		}
+	}
+
+}
+
+// TODO: Remove for GetImage
+/*func (dataAccess *baseDataAccess) createImage(fullData []byte) (image.Image, error) {
 	var img image.Image
 
 	switch dataAccess.photometricInterpretation {
@@ -206,7 +270,7 @@ func (dataAccess *baseDataAccess) createImage(fullData []byte) (image.Image, err
 	}
 
 	return img, nil
-}
+}*/
 
 type StripDataAccess struct {
 	baseDataAccess
@@ -303,14 +367,15 @@ func (dataAccess *StripDataAccess) GetFullData() ([]byte, error) {
 	return fullData, nil
 }
 
-func (dataAccess *StripDataAccess) GetImage() (image.Image, error) {
+/*func (dataAccess *StripDataAccess) GetImage(index uint32) (image.Image, error) {
+
 	fullData, err := dataAccess.GetFullData()
 	if err != nil {
 		return nil, err
 	}
 
 	return dataAccess.createImage(fullData)
-}
+}*/
 
 type TileDataAccess struct {
 	baseDataAccess
@@ -425,34 +490,24 @@ func (dataAccess *TileDataAccess) GetFullData() ([]byte, error) {
 	return nil, &FormatError{msg: "UNIMPLEMENTED GetFullData for TileDataAccess!!"}
 }
 
-func (dataAccess *TileDataAccess) GetImage() (image.Image, error) {
+/*func (dataAccess *TileDataAccess) GetImage() (image.Image, error) {
 	fullData, err := dataAccess.GetFullData()
 	if err != nil {
 		return nil, err
 	}
 
 	return dataAccess.createImage(fullData)
-}
+}*/
 
 func (section *Section) GetData() ([]byte, error) {
 	return section.dataAccess.GetData(section.Index)
 }
 
 func (section *Section) GetImage() (image.Image, error) {
-	w, h := section.dataAccess.GetSectionDimensions()
-
-	img := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
-	data, err := section.GetRGBAData()
-	if err != nil {
-		return nil, err
-	}
-
-	img.Pix = data
-
-	return img, nil
+	return section.dataAccess.GetImage(section.Index)
 }
 
-func (section *Section) GetRGBData() ([]byte, error) {
+/*func (section *Section) GetRGBData() ([]byte, error) {
 	rawData, err := section.GetData()
 
 	if err != nil {
@@ -465,7 +520,7 @@ func (section *Section) GetRGBData() ([]byte, error) {
 		// TODO: check if data has 4 SamplesPerPixel
 
 		return rawData, nil
-	case YCbCr: /*
+	case YCbCr:
 			//fmt.Printf("HI!%d\n", len(rawData))
 			w, h := section.dataAccess.GetSectionDimensions()
 
@@ -485,7 +540,7 @@ func (section *Section) GetRGBData() ([]byte, error) {
 				/*rawData[i*3] = rawData[i*3]
 				rawData[i*3+1] = rawData[i*3+1]
 				rawData[i*3+2] = rawData[i*3+2]
-			}*/
+			}
 		return rawData, nil
 	default:
 		return nil, &FormatError{msg: "Unsupported PhotometricInterpretation: " + photometricInterpretationNameMap[section.dataAccess.GetPhotometricInterpretation()]}
@@ -539,4 +594,4 @@ func (section *Section) GetRGBAData() ([]byte, error) {
 	}
 
 	return rgba, nil
-}
+}*/

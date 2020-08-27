@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"image"
 	"io"
 	"io/ioutil"
 
 	"golang.org/x/image/tiff/lzw"
 
-	"github.com/AlanRace/go-bio/jpeg"
 	"github.com/AlanRace/go-bio/libjpeg"
 )
 
@@ -62,20 +62,12 @@ func init() {
 
 			r := bytes.NewReader(tablesTag.Data)
 
-			j, err := libjpeg.NewJPEGFromHeader(r)
+			ljpeg, err := libjpeg.NewJPEGFromHeader(r)
 			if err != nil {
 				return nil, fmt.Errorf("Failed parsing JPEG header (libjpeg) %w", err)
 			}
 
-			// Reset the reader
-			r = bytes.NewReader(tablesTag.Data)
-
-			header, err := jpeg.DecodeHeader(r)
-			if err != nil {
-				return nil, err
-			}
-
-			return &JPEGCompression{header: header, j: j}, nil
+			return &JPEGCompression{ljpeg: ljpeg}, nil
 		}
 
 		return nil, &FormatError{msg: "No JPEGTables tag, unsupported form of JPEG compression"}
@@ -85,13 +77,25 @@ func init() {
 	})
 }
 
-// CompressionMethod is an interface for decompressing a io.Reader to a []byte.
+// CompressionMethod is an interface for decompressing a io.Reader.
 type CompressionMethod interface {
+}
+
+// BinaryDecompressor just returns binary data and doesn't know anything about an image. e.g. LZW
+type BinaryDecompressor interface {
+	CompressionMethod
 	Decompress(io.Reader) ([]byte, error)
+}
+
+// ImageDecompressor returns an image as the information required to reconstruct this are included in the compressed data e.g. JPEG
+type ImageDecompressor interface {
+	CompressionMethod
+	Decompress(io.Reader) (image.Image, error)
 }
 
 // NoCompression performs no decompression of data.
 type NoCompression struct {
+	CompressionMethod
 }
 
 // Decompress extracts bytes from io.Reader.
@@ -169,43 +173,14 @@ func unpackBits(r io.Reader) ([]byte, error) {
 
 // JPEGCompression
 type JPEGCompression struct {
-	header *jpeg.JPEGHeader
+	//header *jpeg.JPEGHeader
 
-	j *libjpeg.JPEG
+	ljpeg *libjpeg.JPEG
 }
 
 // Decompress decompresses an io.Reader using the JPEG algorithm.
-func (c *JPEGCompression) Decompress(r io.Reader) ([]byte, error) {
-	image, err := c.j.DecodeBody(r)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: Rethink this way of handling JPEG data - shouldn't need to make a new array
-	var byteData []byte
-	byteData = make([]byte, image.Bounds().Max.X*image.Bounds().Max.Y*3)
-
-	index := 0
-	for y := 0; y < image.Bounds().Max.Y; y++ {
-		for x := 0; x < image.Bounds().Max.X; x++ {
-			r, g, b, _ := image.At(x, y).RGBA()
-
-			byteData[index] = byte(r / 257)
-			byteData[index+1] = byte(g / 257)
-			byteData[index+2] = byte(b / 257)
-
-			index += 3
-		}
-	}
-
-	return byteData, nil
-
-	/*data, err := c.header.DecodeBody(r)
-	if err != nil {
-		return nil, err
-	}
-
-	return data.Data, nil*/
+func (compression *JPEGCompression) Decompress(r io.Reader) (image.Image, error) {
+	return compression.ljpeg.DecodeBody(r)
 }
 
 // Decompress decompresses the data supplied in the io.Reader using the compression method dictated by CompressionID.
