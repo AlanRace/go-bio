@@ -159,8 +159,6 @@ import (
 	"image/color"
 	"io"
 	"unsafe"
-
-	"github.com/pixiv/go-libjpeg/rgb"
 )
 
 type JPEG struct {
@@ -465,7 +463,7 @@ func decodeYCbCr(dinfo *C.struct_jpeg_decompress_struct) (dest *image.YCbCr, err
 	return
 }
 
-func readRGBScanlines(dinfo *C.struct_jpeg_decompress_struct, pix []uint8, stride int) (err error) {
+func readRGBScanlines(dinfo *C.struct_jpeg_decompress_struct, dest *image.RGBA, stride int) (err error) {
 	err = startDecompress(dinfo)
 	if err != nil {
 		return
@@ -477,28 +475,45 @@ func readRGBScanlines(dinfo *C.struct_jpeg_decompress_struct, pix []uint8, strid
 		}
 	}()
 
+	tempBuff := make([]uint8, stride)
+
 	for dinfo.output_scanline < dinfo.output_height {
-		pbuf := (*C.uchar)(unsafe.Pointer(&pix[stride*int(dinfo.output_scanline)]))
+		startingIndex := int(dinfo.output_scanline) * stride
+
+		pbuf := (*C.uchar)(unsafe.Pointer(&tempBuff[0]))
 		_, err = readScanlines(dinfo, pbuf, C.int(stride), dinfo.rec_outbuf_height)
 		if err != nil {
-			return
+			return err
+		}
+
+		// TODO: If RGBA then don't need to do this
+		if dinfo.num_components == 3 {
+			for i := 0; i < stride/4; i++ {
+				dest.Pix[startingIndex+i*4] = tempBuff[i*3]
+				dest.Pix[startingIndex+i*4+1] = tempBuff[i*3+1]
+				dest.Pix[startingIndex+i*4+2] = tempBuff[i*3+2]
+				dest.Pix[startingIndex+i*4+3] = 255
+			}
+		} else {
+			return fmt.Errorf("Unsupported number of components when readRGBScanlines")
 		}
 	}
 	return
 }
 
 // TODO: supports decoding into image.RGBA instead of rgb.Image.
-func decodeRGB(dinfo *C.struct_jpeg_decompress_struct) (dest *rgb.Image, err error) {
+func decodeRGB(dinfo *C.struct_jpeg_decompress_struct) (dest *image.RGBA, err error) {
 	C.jpeg_calc_output_dimensions(dinfo)
-	dest = rgb.NewImage(image.Rect(0, 0, int(dinfo.output_width), int(dinfo.output_height)))
+	//dest = rgb.NewImage(image.Rect(0, 0, int(dinfo.output_width), int(dinfo.output_height)))
+	dest = image.NewRGBA(image.Rect(0, 0, int(dinfo.output_width), int(dinfo.output_height)))
 
 	dinfo.out_color_space = C.JCS_RGB
-	err = readRGBScanlines(dinfo, dest.Pix, dest.Stride)
+	err = readRGBScanlines(dinfo, dest, dest.Stride)
 	return
 }
 
 // DecodeIntoRGB reads a JPEG data stream from r and returns decoded image as an rgb.Image with RGB colors.
-func DecodeIntoRGB(r io.Reader, options *DecoderOptions) (dest *rgb.Image, err error) {
+func DecodeIntoRGB(r io.Reader, options *DecoderOptions) (dest *image.RGBA, err error) {
 	dinfo := newDecompress(r)
 	if dinfo == nil {
 		return nil, errors.New("allocation failed")
@@ -547,7 +562,7 @@ func DecodeIntoRGBA(r io.Reader, options *DecoderOptions) (dest *image.RGBA, err
 		return nil, errors.New("JCS_EXT_RGBA is not supported (probably built without libjpeg-turbo)")
 	}
 	dinfo.out_color_space = colorSpace
-	err = readRGBScanlines(dinfo, dest.Pix, dest.Stride)
+	err = readRGBScanlines(dinfo, dest, dest.Stride)
 
 	return
 }
