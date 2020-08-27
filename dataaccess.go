@@ -15,13 +15,14 @@ type DataAccess interface {
 
 	// TODO: Reasses whether these are necessary with the new Section API
 	//GetDataIndexAt(x uint32, y uint32) uint32
-	GetCompressedData(index uint32) ([]byte, error)
-	GetData(index uint32) ([]byte, error)
-	GetImage(index uint32) (image.Image, error)
+	GetCompressedData(section *Section) ([]byte, error)
+	GetData(section *Section) ([]byte, error)
+	GetImage(section *Section) (image.Image, error)
 
 	//GetFullData() ([]byte, error)
 
 	GetPhotometricInterpretation() PhotometricInterpretationID
+	GetPredictor() PredictorID
 	GetSamplesPerPixel() uint16
 
 	GetSection(index uint32) *Section
@@ -41,6 +42,8 @@ type baseDataAccess struct {
 
 	compressionID             CompressionID
 	photometricInterpretation PhotometricInterpretationID
+
+	predictor PredictorID
 
 	compression CompressionMethod
 
@@ -65,6 +68,8 @@ func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) 
 	if err != nil {
 		return err
 	}
+	dataAccess.predictor = ifd.GetPredictor()
+
 	dataAccess.samplesPerPixel, err = ifd.GetShortTagValue(SamplesPerPixel)
 	if err != nil {
 		return err
@@ -98,12 +103,20 @@ func (dataAccess *baseDataAccess) GetTag(tagID TagID) Tag {
 	return dataAccess.ifd.GetTag(tagID)
 }
 
+func (dataAccess *baseDataAccess) HasTag(tagID TagID) bool {
+	return dataAccess.ifd.HasTag(tagID)
+}
+
 func (dataAccess *baseDataAccess) GetByteTag(tagID TagID) (*ByteTag, bool) {
 	return dataAccess.ifd.GetByteTag(tagID)
 }
 
 func (dataAccess *baseDataAccess) GetPhotometricInterpretation() PhotometricInterpretationID {
 	return dataAccess.photometricInterpretation
+}
+
+func (dataAccess *baseDataAccess) GetPredictor() PredictorID {
+	return dataAccess.predictor
 }
 
 func (dataAccess *baseDataAccess) GetSamplesPerPixel() uint16 {
@@ -115,11 +128,11 @@ func (dataAccess *baseDataAccess) GetImageDimensions() (uint32, uint32) {
 }
 
 // GetCompressedData returns the data as it is found in the file, without decompression
-func (dataAccess *baseDataAccess) GetCompressedData(index uint32) ([]byte, error) {
+func (dataAccess *baseDataAccess) GetCompressedData(section *Section) ([]byte, error) {
 	var byteData []byte
 
-	offset := dataAccess.offsets[index]
-	dataSize := dataAccess.byteCounts[index]
+	offset := dataAccess.offsets[section.Index]
+	dataSize := dataAccess.byteCounts[section.Index]
 
 	//log.Printf("About to read %d bytes from %d (%d)\n", dataSize, offset, int64(offset))
 
@@ -141,22 +154,49 @@ func (dataAccess *baseDataAccess) GetCompressedData(index uint32) ([]byte, error
 	return byteData, nil
 }
 
-func (dataAccess *baseDataAccess) GetData(index uint32) ([]byte, error) {
+func (dataAccess *baseDataAccess) GetData(section *Section) ([]byte, error) {
+	var data []byte
+	var err error
+
 	switch compression := dataAccess.compression.(type) {
 	case BinaryDecompressor:
 		var r io.Reader
-		byteData, err := dataAccess.GetCompressedData(index)
+		byteData, err := dataAccess.GetCompressedData(section)
 		if err != nil {
 			return nil, err
 		}
 		r = bytes.NewReader(byteData)
 
-		return compression.Decompress(r)
+		data, err = compression.Decompress(r)
 	case NoCompression:
-		return dataAccess.GetCompressedData(index)
+		data, err = dataAccess.GetCompressedData(section)
 	default:
 		return nil, fmt.Errorf("Can't use GetData when compression type is %T. Use GetImage instead", compression)
 	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Check whether we need to apply predictor
+	if dataAccess.HasTag(Predictor) {
+		switch dataAccess.GetPredictor() {
+		case PredictorHorizontal:
+			for y := 0; y < int(section.Height); y++ {
+				for x := 1; x < int(section.Width); x++ {
+					index := (y * int(section.Width)) + x
+
+					samplesPerPixel := int(dataAccess.samplesPerPixel)
+
+					for k := 0; k < samplesPerPixel; k++ {
+						data[index*samplesPerPixel+k] += data[(index-1)*samplesPerPixel+k]
+					}
+				}
+			}
+		}
+	}
+
+	return data, err
 }
 
 func (dataAccess *baseDataAccess) PixelSizeInBytes() uint32 {
@@ -183,15 +223,20 @@ type subImager interface {
 // GetImage returns an image for the section at the specified index. If the compression can decompress to an image directly,
 // this is returned (after cropping to the size of the section). If compression only supports binary, then the PhotometricInterpretation
 // in the tiff header is taken into account.
-func (dataAccess baseDataAccess) GetImage(index uint32) (image.Image, error) {
+func (dataAccess baseDataAccess) GetImage(section *Section) (image.Image, error) {
 	switch compression := dataAccess.compression.(type) {
 	case ImageDecompressor:
 		var r io.Reader
-		byteData, err := dataAccess.GetCompressedData(index)
+		byteData, err := dataAccess.GetCompressedData(section)
 		if err != nil {
 			return nil, err
 		}
 		r = bytes.NewReader(byteData)
+
+		jcompression, ok := compression.(*JPEGCompression)
+		if ok {
+			jcompression.SetPhotometricInterpretation(dataAccess.GetPhotometricInterpretation())
+		}
 
 		img, err := compression.Decompress(r)
 
@@ -205,7 +250,8 @@ func (dataAccess baseDataAccess) GetImage(index uint32) (image.Image, error) {
 
 		simg, ok := img.(subImager)
 		if !ok {
-			return nil, fmt.Errorf("Image section at index %d is not same size as section and cannot be cropped", index)
+			//return img, nil
+			return nil, fmt.Errorf("Image section at index %d is not same size as section and cannot be cropped (%T)", section.Index, img)
 		}
 
 		return simg.SubImage(image.Rect(0, 0, int(dataAccess.imageWidth), int(dataAccess.imageLength))), nil
@@ -213,17 +259,29 @@ func (dataAccess baseDataAccess) GetImage(index uint32) (image.Image, error) {
 	default:
 		switch dataAccess.GetPhotometricInterpretation() {
 		case RGB:
-			w, h := int(dataAccess.imageWidth), int(dataAccess.imageLength) //dataAccess.GetSectionDimensions()
-
-			img := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
-			// TODO: Should this be GetRGBA data?
-			data, err := dataAccess.GetData(index)
+			fullData, err := dataAccess.GetData(section)
 			if err != nil {
 				return nil, err
 			}
+			rgbImg := image.NewRGBA(image.Rect(0, 0, int(section.Width), int(section.Height)))
+			data := make([]byte, len(fullData)/3*4)
 
-			img.Pix = data
-			return img, nil
+			for i := 0; i < len(data)/4; i++ {
+				data[i*4] = fullData[i*3]
+				data[i*4+1] = fullData[i*3+1]
+				data[i*4+2] = fullData[i*3+2]
+				data[i*4+3] = 255
+			}
+
+			rgbImg.Pix = data
+			// TODO: Should this be GetRGBA data?
+			//data, err := dataAccess.GetData(index)
+			//if err != nil {
+			//		return nil, err
+			//		}
+
+			//		img.Pix = data
+			return rgbImg, nil
 		default:
 			return nil, &FormatError{msg: "Unsupported PhotometricInterpretation: " + photometricInterpretationNameMap[dataAccess.GetPhotometricInterpretation()]}
 		}
@@ -346,7 +404,7 @@ func (dataAccess *StripDataAccess) GetStripInBytes() uint32 {
 	return dataAccess.imageWidth * dataAccess.rowsPerStrip * dataAccess.PixelSizeInBytes()
 }
 
-func (dataAccess *StripDataAccess) GetFullData() ([]byte, error) {
+/*func (dataAccess *StripDataAccess) GetFullData() ([]byte, error) {
 	var stripIndex uint32
 	fullData := make([]byte, dataAccess.ImageSizeInBytes())
 
@@ -365,7 +423,7 @@ func (dataAccess *StripDataAccess) GetFullData() ([]byte, error) {
 	}
 
 	return fullData, nil
-}
+}*/
 
 /*func (dataAccess *StripDataAccess) GetImage(index uint32) (image.Image, error) {
 
@@ -482,7 +540,7 @@ func (dataAccess *TileDataAccess) GetSection(index uint32) *Section {
 func (dataAccess *TileDataAccess) GetTileData(x uint32, y uint32) ([]byte, error) {
 	tileIndex := y*dataAccess.tilesAcross + x
 
-	return dataAccess.GetData(tileIndex)
+	return dataAccess.GetData(dataAccess.GetSection(tileIndex))
 }
 
 func (dataAccess *TileDataAccess) GetFullData() ([]byte, error) {
@@ -500,11 +558,11 @@ func (dataAccess *TileDataAccess) GetFullData() ([]byte, error) {
 }*/
 
 func (section *Section) GetData() ([]byte, error) {
-	return section.dataAccess.GetData(section.Index)
+	return section.dataAccess.GetData(section)
 }
 
 func (section *Section) GetImage() (image.Image, error) {
-	return section.dataAccess.GetImage(section.Index)
+	return section.dataAccess.GetImage(section)
 }
 
 /*func (section *Section) GetRGBData() ([]byte, error) {
