@@ -3,7 +3,6 @@ package gobio
 import (
 	"encoding/binary"
 	"fmt"
-	"image"
 	"os"
 )
 
@@ -178,6 +177,18 @@ func Open(location string) (*File, error) {
 	return &tiffFile, nil
 }
 
+func (file File) NumResolutions() int {
+	numRes := 1
+
+	for i := 1; i < len(file.IFDList); i++ {
+		if file.IFDList[i].IsReducedResolutionImage() {
+			numRes++
+		}
+	}
+
+	return numRes
+}
+
 // func Open(path string) (File, error) {
 // 	var err error
 
@@ -295,6 +306,12 @@ func (ifd *ImageFileDirectory) PrintMetadata() {
 	}
 }
 
+func (ifd *ImageFileDirectory) HasTag(tagID TagID) bool {
+	_, ok := ifd.Tags[tagID]
+
+	return ok
+}
+
 func (ifd *ImageFileDirectory) GetTag(tagID TagID) Tag {
 	return ifd.Tags[tagID]
 }
@@ -364,12 +381,16 @@ func (ifd *ImageFileDirectory) GetImageDimensions() (uint32, uint32) {
 
 // GetResolution returns the size of a pixel in x and y and the associated unit
 func (ifd *ImageFileDirectory) GetResolution() (float64, float64, ResolutionUnitID, error) {
-	resoutionUnit, err := ifd.GetResolutionUnit()
+	if !ifd.HasTag(ResolutionUnit) {
+		return 0.0, 0.0, 0, fmt.Errorf("No resolution unit tag present")
+	}
+
+	resolutionUnit, err := ifd.GetResolutionUnit()
 	if err != nil {
 		return 0.0, 0.0, 0, err
 	}
 
-	return 1.0 / ifd.GetRationalTagValue(XResolution), 1.0 / ifd.GetRationalTagValue(YResolution), resoutionUnit, nil
+	return 1.0 / ifd.GetRationalTagValue(XResolution), 1.0 / ifd.GetRationalTagValue(YResolution), resolutionUnit, nil
 }
 
 func (ifd *ImageFileDirectory) GetBitsPerSample() (uint16, error) {
@@ -450,13 +471,13 @@ func (ifd *ImageFileDirectory) GetData(index uint32) ([]byte, error) {
 	return ifd.dataAccess.GetData(index)
 }
 
-func (ifd *ImageFileDirectory) GetFullData() ([]byte, error) {
-	return ifd.dataAccess.GetFullData()
-}
+//func (ifd *ImageFileDirectory) GetFullData() ([]byte, error) {
+//	return ifd.dataAccess.GetFullData()
+//}
 
-func (ifd *ImageFileDirectory) GetImage() (image.Image, error) {
-	return ifd.dataAccess.GetImage()
-}
+//func (ifd *ImageFileDirectory) GetImage() (image.Image, error) {
+//	return ifd.dataAccess.GetImage()
+//}
 
 func (ifd *ImageFileDirectory) IsTiled() bool {
 	return ifd.GetTag(TileWidth) != nil
