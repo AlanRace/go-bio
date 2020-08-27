@@ -429,6 +429,15 @@ func (ifd *ImageFileDirectory) GetPhotometricInterpretation() (PhotometricInterp
 	return photometricInterpretationTypeMap[photometricInterpretationID], nil
 }
 
+func (ifd *ImageFileDirectory) GetPredictor() PredictorID {
+	predictorID, err := ifd.GetShortTagValue(Predictor)
+	if err != nil {
+		return 1
+	}
+
+	return predictorTypeMap[predictorID]
+}
+
 // IsReducedResolutionImage checks whether the reduced resolution bit is set in the NewSubfileType tag
 // TODO: Check the SubfileType tag as well, to support older versions
 func (ifd *ImageFileDirectory) IsReducedResolutionImage() bool {
@@ -463,12 +472,12 @@ func (ifd *ImageFileDirectory) GetSectionGrid() (uint32, uint32) {
 	return ifd.dataAccess.GetSectionGrid()
 }
 
-func (ifd *ImageFileDirectory) GetCompressedData(index uint32) ([]byte, error) {
-	return ifd.dataAccess.GetCompressedData(index)
+func (ifd *ImageFileDirectory) GetCompressedData(section *Section) ([]byte, error) {
+	return ifd.dataAccess.GetCompressedData(section)
 }
 
-func (ifd *ImageFileDirectory) GetData(index uint32) ([]byte, error) {
-	return ifd.dataAccess.GetData(index)
+func (ifd *ImageFileDirectory) GetData(section *Section) ([]byte, error) {
+	return ifd.dataAccess.GetData(section)
 }
 
 //func (ifd *ImageFileDirectory) GetFullData() ([]byte, error) {

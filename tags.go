@@ -50,6 +50,7 @@ const (
 	Model TagID = 272
 	// StripOffsets describes the byte offset of the strips of data. This is only used when the tiff data is stored in strips (not tiles).
 	StripOffsets TagID = 273
+	Orientation  TagID = 274
 	// SamplesPerPixel describes the number of samples per pixel.
 	SamplesPerPixel     TagID = 277
 	RowsPerStrip        TagID = 278
@@ -91,6 +92,7 @@ var tagIDMap = map[uint16]TagID{
 	271: Make,
 	272: Model,
 	273: StripOffsets,
+	274: Orientation,
 	277: SamplesPerPixel,
 	278: RowsPerStrip,
 	279: StripByteCounts,
@@ -129,6 +131,7 @@ var tagNameMap = map[TagID]string{
 	Make:                      "Make",
 	Model:                     "Model",
 	StripOffsets:              "StripOffsets",
+	Orientation:               "Orientation",
 	SamplesPerPixel:           "SamplesPerPixel",
 	RowsPerStrip:              "RowsPerStrip",
 	StripByteCounts:           "StripByteCounts",
@@ -331,6 +334,26 @@ var resolutionUnitTypeMap = map[uint16]ResolutionUnitID{
 	1: NoUnit,
 	2: Inch,
 	3: Centimeter,
+}
+
+type PredictorID uint16
+
+const (
+	PredictorNone          PredictorID = 1
+	PredictorHorizontal    PredictorID = 2
+	PredictorFloatingPoint PredictorID = 3
+)
+
+var predictorNameMap = map[PredictorID]string{
+	PredictorNone:          "PredictorNone",
+	PredictorHorizontal:    "PredictorHorizontal",
+	PredictorFloatingPoint: "PredictorFloatingPoint",
+}
+
+var predictorTypeMap = map[uint16]PredictorID{
+	1: PredictorNone,
+	2: PredictorHorizontal,
+	3: PredictorFloatingPoint,
 }
 
 type Tag interface {
