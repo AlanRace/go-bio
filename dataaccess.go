@@ -235,7 +235,6 @@ func (dataAccess baseDataAccess) GetImage(section *Section) (image.Image, error)
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(len(byteData))
 		r = bytes.NewReader(byteData)
 
 		jcompression, ok := compression.(*JPEGCompression)
@@ -255,7 +254,6 @@ func (dataAccess baseDataAccess) GetImage(section *Section) (image.Image, error)
 
 		simg, ok := img.(subImager)
 		if !ok {
-			//return img, nil
 			return nil, fmt.Errorf("Image section at index %d is not same size as section and cannot be cropped (%T)", section.Index, img)
 		}
 
