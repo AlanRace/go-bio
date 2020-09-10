@@ -169,6 +169,12 @@ type JPEG struct {
 	colourSpace C.J_COLOR_SPACE
 }
 
+func NewJPEG() *JPEG {
+	var j JPEG
+
+	return &j
+}
+
 func NewJPEGFromHeader(r io.Reader) (*JPEG, error) {
 	var j JPEG
 
@@ -208,7 +214,9 @@ func (j *JPEG) DecodeBody(r io.Reader) (dest image.Image, err error) {
 	defer destroyDecompress(dinfo)
 
 	// Copy across any necessary values from header
-	dinfo.quant_tbl_ptrs = j.dinfo.quant_tbl_ptrs
+	if j.dinfo != nil {
+		dinfo.quant_tbl_ptrs = j.dinfo.quant_tbl_ptrs
+	}
 
 	makeSourceManager(r, dinfo)
 

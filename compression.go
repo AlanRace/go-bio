@@ -70,7 +70,7 @@ func init() {
 			return &JPEGCompression{ljpeg: ljpeg}, nil
 		}
 
-		return nil, &FormatError{msg: "No JPEGTables tag, unsupported form of JPEG compression"}
+		return &JPEGCompression{ljpeg: libjpeg.NewJPEG()}, nil
 	})
 	AddCompression(PackBits, "PackBits", func(dataAccess TagAccess) (CompressionMethod, error) {
 		return &PackBitsCompression{}, nil
@@ -177,6 +177,10 @@ type JPEGCompression struct {
 	//header *jpeg.JPEGHeader
 
 	ljpeg *libjpeg.JPEG
+}
+
+func NewJPEGCompression(ljpeg *libjpeg.JPEG) *JPEGCompression {
+	return &JPEGCompression{ljpeg: ljpeg}
 }
 
 // Decompress decompresses an io.Reader using the JPEG algorithm.

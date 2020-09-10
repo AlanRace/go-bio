@@ -62,6 +62,7 @@ type TagAccess interface {
 	GetTag(tagID TagID) Tag
 
 	GetByteTag(tagID TagID) (*ByteTag, bool)
+	GetLongTag(tagID TagID) (*LongTag, bool)
 }
 
 func (e *FormatError) Error() string { return e.msg }
@@ -348,6 +349,11 @@ func (ifd *ImageFileDirectory) GetTag(tagID TagID) Tag {
 
 func (ifd *ImageFileDirectory) GetByteTag(tagID TagID) (*ByteTag, bool) {
 	tag, ok := ifd.Tags[tagID].(*ByteTag)
+	return tag, ok
+}
+
+func (ifd *ImageFileDirectory) GetLongTag(tagID TagID) (*LongTag, bool) {
+	tag, ok := ifd.Tags[tagID].(*LongTag)
 	return tag, ok
 }
 

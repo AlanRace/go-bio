@@ -111,6 +111,10 @@ func (dataAccess *baseDataAccess) GetByteTag(tagID TagID) (*ByteTag, bool) {
 	return dataAccess.ifd.GetByteTag(tagID)
 }
 
+func (dataAccess *baseDataAccess) GetLongTag(tagID TagID) (*LongTag, bool) {
+	return dataAccess.ifd.GetLongTag(tagID)
+}
+
 func (dataAccess *baseDataAccess) GetPhotometricInterpretation() PhotometricInterpretationID {
 	return dataAccess.photometricInterpretation
 }
@@ -231,6 +235,7 @@ func (dataAccess baseDataAccess) GetImage(section *Section) (image.Image, error)
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println(len(byteData))
 		r = bytes.NewReader(byteData)
 
 		jcompression, ok := compression.(*JPEGCompression)
@@ -244,7 +249,7 @@ func (dataAccess baseDataAccess) GetImage(section *Section) (image.Image, error)
 			return nil, err
 		}
 
-		if img.Bounds().Max.X == int(dataAccess.imageWidth) && img.Bounds().Max.Y == int(dataAccess.imageLength) {
+		if img.Bounds().Max.X == int(section.Width) && img.Bounds().Max.Y == int(section.Height) {
 			return img, nil
 		}
 
@@ -254,7 +259,7 @@ func (dataAccess baseDataAccess) GetImage(section *Section) (image.Image, error)
 			return nil, fmt.Errorf("Image section at index %d is not same size as section and cannot be cropped (%T)", section.Index, img)
 		}
 
-		return simg.SubImage(image.Rect(0, 0, int(dataAccess.imageWidth), int(dataAccess.imageLength))), nil
+		return simg.SubImage(image.Rect(0, 0, int(section.Width), int(section.Height))), nil
 
 	default:
 		switch dataAccess.GetPhotometricInterpretation() {
@@ -283,7 +288,7 @@ func (dataAccess baseDataAccess) GetImage(section *Section) (image.Image, error)
 			//		img.Pix = data
 			return rgbImg, nil
 		default:
-			return nil, &FormatError{msg: "Unsupported PhotometricInterpretation: " + photometricInterpretationNameMap[dataAccess.GetPhotometricInterpretation()]}
+			return nil, &FormatError{msg: "[GetImage] Unsupported PhotometricInterpretation: " + photometricInterpretationNameMap[dataAccess.GetPhotometricInterpretation()]}
 		}
 	}
 
