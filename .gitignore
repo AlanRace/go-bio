@@ -16,3 +16,9 @@ libjpeg/test/out/.keep
 libjpeg/test/out/
 
 cmd/tiffinfo/tiffinfo
+
+*.tif
+
+test/libtiffpic/g3test.g3
+
+test/libtiffpic/README

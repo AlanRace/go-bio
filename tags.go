@@ -34,6 +34,7 @@ func (slice TagIDSlice) Sort() { sort.Sort(slice) }
 
 const (
 	NewSubFileType TagID = 254
+	SubfileType    TagID = 255
 	// ImageWidth describes the width of the image in pixels.
 	ImageWidth TagID = 256
 	// ImageLength describes the length (height) of the image in pixels.
@@ -44,6 +45,8 @@ const (
 	Compression TagID = 259
 	// PhotometricInterpretation describes the way that pixel data is stored.
 	PhotometricInterpretation TagID = 262
+	Thresholding              TagID = 263
+	FillOrder                 TagID = 266
 	ImageDescription          TagID = 270
 	// Make describes the make of the microscope used to acquire the data.
 	Make TagID = 271
@@ -53,28 +56,51 @@ const (
 	StripOffsets TagID = 273
 	Orientation  TagID = 274
 	// SamplesPerPixel describes the number of samples per pixel.
-	SamplesPerPixel     TagID = 277
-	RowsPerStrip        TagID = 278
-	StripByteCounts     TagID = 279
-	XResolution         TagID = 282
-	YResolution         TagID = 283
-	PlanarConfiguration TagID = 284
-	XPosition           TagID = 286
-	YPosition           TagID = 287
-	ResolutionUnit      TagID = 296
-	Software            TagID = 305
-	DateTime            TagID = 306
-	Predictor           TagID = 317
-	TileWidth           TagID = 322
-	TileLength          TagID = 323
-	TileOffsets         TagID = 324
-	TileByteCounts      TagID = 325
-	SampleFormat        TagID = 339
-	SMinSampleValue     TagID = 340
-	SMaxSampleValue     TagID = 341
-	JPEGTables          TagID = 347
-	YCbCrSubSampling    TagID = 530
-	ReferenceBlackWhite TagID = 532
+	SamplesPerPixel             TagID = 277
+	RowsPerStrip                TagID = 278
+	StripByteCounts             TagID = 279
+	MinSampleValue              TagID = 280
+	MaxSampleValue              TagID = 281
+	XResolution                 TagID = 282
+	YResolution                 TagID = 283
+	PlanarConfiguration         TagID = 284
+	XPosition                   TagID = 286
+	YPosition                   TagID = 287
+	T4Options                   TagID = 292
+	ResolutionUnit              TagID = 296
+	PageNumber                  TagID = 297
+	Software                    TagID = 305
+	DateTime                    TagID = 306
+	Predictor                   TagID = 317
+	ColorMap                    TagID = 320
+	HalftoneHints               TagID = 321
+	TileWidth                   TagID = 322
+	TileLength                  TagID = 323
+	TileOffsets                 TagID = 324
+	TileByteCounts              TagID = 325
+	BadFaxLines                 TagID = 326
+	CleanFaxData                TagID = 327
+	ConsecutiveBadFaxLines      TagID = 328
+	ExtraSamples                TagID = 338
+	SampleFormat                TagID = 339
+	SMinSampleValue             TagID = 340
+	SMaxSampleValue             TagID = 341
+	JPEGTables                  TagID = 347
+	JPEGProc                    TagID = 512
+	JPEGInterchangeFormat       TagID = 513
+	JPEGInterchangeFormatLength TagID = 514
+	JPEGRestartInterval         TagID = 515
+	JPEGQTables                 TagID = 519
+	JPEGDCTables                TagID = 520
+	JPEGACTables                TagID = 521
+	YCbCrCoefficients           TagID = 529
+	YCbCrSubSampling            TagID = 530
+	YCbCrPositioning            TagID = 531
+	ReferenceBlackWhite         TagID = 532
+
+	Copyright    TagID = 33432
+	ExifIFD      TagID = 34665
+	GDALMetadata TagID = 42112
 
 	// Probable NDPI specific
 	//XOffsetFromSlideCentre TagID = 65422
@@ -84,11 +110,14 @@ const (
 
 var tagIDMap = map[uint16]TagID{
 	254: NewSubFileType,
+	255: SubfileType,
 	256: ImageWidth,
 	257: ImageLength,
 	258: BitsPerSample,
 	259: Compression,
 	262: PhotometricInterpretation,
+	263: Thresholding,
+	266: FillOrder,
 	270: ImageDescription,
 	271: Make,
 	272: Model,
@@ -97,25 +126,48 @@ var tagIDMap = map[uint16]TagID{
 	277: SamplesPerPixel,
 	278: RowsPerStrip,
 	279: StripByteCounts,
+	280: MinSampleValue,
+	281: MaxSampleValue,
 	282: XResolution,
 	283: YResolution,
 	286: XPosition,
 	287: YPosition,
 	284: PlanarConfiguration,
+	292: T4Options,
 	296: ResolutionUnit,
+	297: PageNumber,
 	305: Software,
 	306: DateTime,
 	317: Predictor,
+	320: ColorMap,
+	321: HalftoneHints,
 	322: TileWidth,
 	323: TileLength,
 	324: TileOffsets,
 	325: TileByteCounts,
+	326: BadFaxLines,
+	327: CleanFaxData,
+	328: ConsecutiveBadFaxLines,
+	338: ExtraSamples,
 	339: SampleFormat,
 	340: SMinSampleValue,
 	341: SMaxSampleValue,
 	347: JPEGTables,
+	512: JPEGProc,
+	513: JPEGInterchangeFormat,
+	514: JPEGInterchangeFormatLength,
+	515: JPEGRestartInterval,
+	519: JPEGQTables,
+	520: JPEGDCTables,
+	521: JPEGACTables,
+	529: YCbCrCoefficients,
 	530: YCbCrSubSampling,
+	531: YCbCrPositioning,
 	532: ReferenceBlackWhite,
+
+	33432: Copyright,
+	34665: ExifIFD,
+	42112: GDALMetadata,
 
 	// NDPI specific?
 	//65422: XOffsetFromSlideCentre,
@@ -124,39 +176,65 @@ var tagIDMap = map[uint16]TagID{
 }
 
 var tagNameMap = map[TagID]string{
-	ImageWidth:                "ImageWidth",
-	ImageLength:               "ImageLength",
-	BitsPerSample:             "BitsPerSample",
-	Compression:               "Compression",
-	PhotometricInterpretation: "PhotometricInterpretation",
-	Make:                      "Make",
-	Model:                     "Model",
-	StripOffsets:              "StripOffsets",
-	Orientation:               "Orientation",
-	SamplesPerPixel:           "SamplesPerPixel",
-	RowsPerStrip:              "RowsPerStrip",
-	StripByteCounts:           "StripByteCounts",
-	XResolution:               "XResolution",
-	YResolution:               "YResolution",
-	PlanarConfiguration:       "PlanarConfiguration",
-	ResolutionUnit:            "ResolutionUnit",
-	Software:                  "Software",
-	DateTime:                  "DateTime",
-	YCbCrSubSampling:          "YCbCrSubSampling",
-	ReferenceBlackWhite:       "ReferenceBlackWhite",
-	TileWidth:                 "TileWidth",
-	TileLength:                "TileLength",
-	TileOffsets:               "TileOffsets",
-	TileByteCounts:            "TileByteCounts",
-	SampleFormat:              "SampleFormat",
-	SMinSampleValue:           "SMinSampleValue",
-	SMaxSampleValue:           "SMaxSampleValue",
-	NewSubFileType:            "NewSubFileType",
-	ImageDescription:          "ImageDescription",
-	XPosition:                 "XPosition",
-	YPosition:                 "YPosition",
-	JPEGTables:                "JPEGTables",
-	Predictor:                 "Predictor",
+	ImageWidth:                  "ImageWidth",
+	ImageLength:                 "ImageLength",
+	BitsPerSample:               "BitsPerSample",
+	Compression:                 "Compression",
+	PhotometricInterpretation:   "PhotometricInterpretation",
+	Make:                        "Make",
+	Model:                       "Model",
+	StripOffsets:                "StripOffsets",
+	Orientation:                 "Orientation",
+	SamplesPerPixel:             "SamplesPerPixel",
+	RowsPerStrip:                "RowsPerStrip",
+	StripByteCounts:             "StripByteCounts",
+	XResolution:                 "XResolution",
+	YResolution:                 "YResolution",
+	PlanarConfiguration:         "PlanarConfiguration",
+	ResolutionUnit:              "ResolutionUnit",
+	Software:                    "Software",
+	DateTime:                    "DateTime",
+	ColorMap:                    "ColorMap",
+	YCbCrSubSampling:            "YCbCrSubSampling",
+	YCbCrPositioning:            "YCbCrPositioning",
+	YCbCrCoefficients:           "YCbCrCoefficients",
+	ReferenceBlackWhite:         "ReferenceBlackWhite",
+	Thresholding:                "Thresholding",
+	TileWidth:                   "TileWidth",
+	TileLength:                  "TileLength",
+	TileOffsets:                 "TileOffsets",
+	TileByteCounts:              "TileByteCounts",
+	SampleFormat:                "SampleFormat",
+	SMinSampleValue:             "SMinSampleValue",
+	SMaxSampleValue:             "SMaxSampleValue",
+	NewSubFileType:              "NewSubFileType",
+	SubfileType:                 "SubfileType",
+	ImageDescription:            "ImageDescription",
+	XPosition:                   "XPosition",
+	YPosition:                   "YPosition",
+	JPEGTables:                  "JPEGTables",
+	JPEGProc:                    "JPEGProc",
+	JPEGInterchangeFormat:       "JPEGInterchangeFormat",
+	JPEGInterchangeFormatLength: "JPEGInterchangeFormatLength",
+	JPEGRestartInterval:         "JPEGRestartInterval",
+	JPEGQTables:                 "JPEGQTables",
+	JPEGDCTables:                "JPEGDCTables",
+	JPEGACTables:                "JPEGACTables",
+	ExtraSamples:                "ExtraSamples",
+	Predictor:                   "Predictor",
+	FillOrder:                   "FillOrder",
+	MinSampleValue:              "MinSampleValue",
+	MaxSampleValue:              "MaxSampleValue",
+	T4Options:                   "T4Options",
+	PageNumber:                  "PageNumber",
+	BadFaxLines:                 "BadFaxLines",
+	CleanFaxData:                "CleanFaxData",
+	ConsecutiveBadFaxLines:      "ConsecutiveBadFaxLines",
+	HalftoneHints:               "HalftoneHints",
+
+	Copyright:    "Copyright",
+	ExifIFD:      "ExifIFD",
+	GDALMetadata: "GDALMetadata",
 
 	// NDPI Specific?
 	//XOffsetFromSlideCentre: "XOffsetFromSlideCentre",

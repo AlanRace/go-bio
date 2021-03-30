@@ -251,19 +251,44 @@ func processLongTag(seeker io.ReadSeeker, endian binary.ByteOrder, tagData *tagD
 func getStripOffsets(ifd *ImageFileDirectory) ([]int64, []int64, error) {
 	var offsets, counts []int64
 
-	stripOffsetsTag, ok := ifd.Tags[StripOffsets].(*LongTag)
-	if !ok {
-		return nil, nil, &FormatError{msg: "Data stored as strips, but StripOffsets appear to be missing"}
+	offsetsTag := ifd.Tags[StripOffsets]
+	byteCountsTag := ifd.Tags[StripByteCounts]
+
+	offsetsLongTag, ok := offsetsTag.(*LongTag)
+	if ok {
+		for index := range offsetsLongTag.Data {
+			offsets = append(offsets, int64(offsetsLongTag.Data[index]))
+		}
+	} else {
+		// Try ShortTag
+		offsetsShortTag, ok := offsetsTag.(*ShortTag)
+
+		if ok {
+			for index := range offsetsShortTag.Data {
+				offsets = append(offsets, int64(offsetsShortTag.Data[index]))
+			}
+		} else {
+			return nil, nil, &FormatError{msg: "Data stored as strip, but can't convert StripOffsets to LongTag or ShortTag"}
+		}
 	}
 
-	stripByteCountsTag, ok := ifd.Tags[StripByteCounts].(*LongTag)
-	if !ok {
-		return nil, nil, &FormatError{msg: "Data stored as strips, but StripByteCounts appear to be missing"}
-	}
+	bytesCountsLongTag, ok := byteCountsTag.(*LongTag)
+	if ok {
+		for index := range bytesCountsLongTag.Data {
+			counts = append(counts, int64(bytesCountsLongTag.Data[index]))
+		}
+	} else {
+		// Try ShortTag
+		bytesCountsShortTag, ok := byteCountsTag.(*ShortTag)
 
-	for index := range stripOffsetsTag.Data {
-		offsets = append(offsets, int64(stripOffsetsTag.Data[index]))
-		counts = append(counts, int64(stripByteCountsTag.Data[index]))
+		if ok {
+
+			for index := range bytesCountsShortTag.Data {
+				counts = append(counts, int64(bytesCountsShortTag.Data[index]))
+			}
+		} else {
+			return nil, nil, &FormatError{msg: "Data stored as strips, but can't convert StripByteCounts to LongTag or ShortTag"}
+		}
 	}
 
 	return offsets, counts, nil
@@ -272,29 +297,55 @@ func getStripOffsets(ifd *ImageFileDirectory) ([]int64, []int64, error) {
 func getTileOffsets(ifd *ImageFileDirectory) ([]int64, []int64, error) {
 	var offsets, counts []int64
 
-	tileOffsetsTag, ok := ifd.Tags[TileOffsets].(*LongTag)
-	if !ok {
+	offsetsTag := ifd.Tags[TileOffsets]
+	byteCountsTag := ifd.Tags[TileByteCounts]
+
+	if offsetsTag == nil {
 		log.Println("Data stored as tiles, but TileOffsets appear to be missing, trying to use StripOffsets")
-		tileOffsetsTag, ok = ifd.Tags[StripOffsets].(*LongTag)
 
-		if !ok {
-			return nil, nil, &FormatError{msg: "Data stored as tiles, but TileOffsets and StripOffsets appear to be missing"}
-		}
+		offsetsTag = ifd.Tags[StripOffsets]
 	}
-
-	tileByteCountsTag, ok := ifd.Tags[TileByteCounts].(*LongTag)
-	if !ok {
+	if byteCountsTag == nil {
 		log.Println("Data stored as tiles, but TileByteCounts appear to be missing, trying to use StripByteCounts")
-		tileByteCountsTag, ok = ifd.Tags[StripByteCounts].(*LongTag)
 
-		if !ok {
-			return nil, nil, &FormatError{msg: "Data stored as tiles, but TileByteCounts and StripByteCounts appear to be missing"}
+		byteCountsTag = ifd.Tags[StripByteCounts]
+	}
+
+	tileOffsetsLongTag, ok := offsetsTag.(*LongTag)
+	if ok {
+		for index := range tileOffsetsLongTag.Data {
+			offsets = append(offsets, int64(tileOffsetsLongTag.Data[index]))
+		}
+	} else {
+		// Try ShortTag
+		tileOffsetsShortTag, ok := offsetsTag.(*ShortTag)
+
+		if ok {
+			for index := range tileOffsetsShortTag.Data {
+				offsets = append(offsets, int64(tileOffsetsShortTag.Data[index]))
+			}
+		} else {
+			return nil, nil, &FormatError{msg: "Data stored as tiles, but can't convert TileOffsets to LongTag or ShortTag"}
 		}
 	}
 
-	for index := range tileOffsetsTag.Data {
-		offsets = append(offsets, int64(tileOffsetsTag.Data[index]))
-		counts = append(counts, int64(tileByteCountsTag.Data[index]))
+	tileBytesCountsLongTag, ok := byteCountsTag.(*LongTag)
+	if ok {
+		for index := range tileBytesCountsLongTag.Data {
+			counts = append(counts, int64(tileBytesCountsLongTag.Data[index]))
+		}
+	} else {
+		// Try ShortTag
+		tileBytesCountsShortTag, ok := byteCountsTag.(*ShortTag)
+
+		if ok {
+
+			for index := range tileBytesCountsShortTag.Data {
+				counts = append(counts, int64(tileBytesCountsShortTag.Data[index]))
+			}
+		} else {
+			return nil, nil, &FormatError{msg: "Data stored as tiles, but can't convert TileByteCounts to LongTag or ShortTag"}
+		}
 	}
 
 	return offsets, counts, nil

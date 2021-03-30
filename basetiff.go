@@ -56,7 +56,9 @@ type File struct {
 }
 
 func (tiffFile *File) Close() {
-	tiffFile.file.Close()
+	if tiffFile != nil && tiffFile.file != nil {
+		tiffFile.file.Close()
+	}
 }
 
 type TagAccess interface {
