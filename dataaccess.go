@@ -264,6 +264,24 @@ func (dataAccess baseDataAccess) GetImage(section *Section) (image.Image, error)
 
 	default:
 		switch dataAccess.GetPhotometricInterpretation() {
+		case BlackIsZero:
+			fullData, err := dataAccess.GetData(section)
+			if err != nil {
+				return nil, err
+			}
+			// TODO: This is pretty wasteful
+			rgbImg := image.NewRGBA(image.Rect(0, 0, int(section.Width), int(section.Height)))
+			data := make([]byte, len(fullData)*4)
+
+			for i := 0; i < len(data)/4; i++ {
+				data[i*4] = fullData[i]
+				data[i*4+1] = fullData[i]
+				data[i*4+2] = fullData[i]
+				data[i*4+3] = 255
+			}
+
+			rgbImg.Pix = data
+			return rgbImg, nil
 		case RGB:
 			fullData, err := dataAccess.GetData(section)
 			if err != nil {
