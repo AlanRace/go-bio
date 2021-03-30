@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"image"
 	"io"
-	"log"
 	"sync"
 )
 
@@ -94,9 +93,7 @@ func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) 
 			return &FormatError{msg: "Unsupported compression scheme " + dataAccess.compressionID.String() + " - missing function"}
 		}
 	} else {
-		log.Println("No compression scheme supplied, so assuming not compressed")
-		dataAccess.compression = Uncompressed
-		//return &FormatError{msg: "Unsupported compression scheme " + dataAccess.compressionID.String()}
+		return &FormatError{msg: "Unsupported compression scheme " + dataAccess.compressionID.String()}
 	}
 
 	return nil

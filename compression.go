@@ -43,7 +43,9 @@ func AddCompression(id CompressionID, name string, create func(TagAccess) (Compr
 }
 
 func init() {
-
+	AddCompression(UndefinedCompression, "Uncompressed", func(dataAccess TagAccess) (CompressionMethod, error) {
+		return &NoCompression{}, nil
+	})
 	AddCompression(Uncompressed, "Uncompressed", func(dataAccess TagAccess) (CompressionMethod, error) {
 		return &NoCompression{}, nil
 	})

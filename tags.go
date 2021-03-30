@@ -259,14 +259,15 @@ func DataTypeNameFromID(typeID uint16) string {
 type CompressionID uint16
 
 const (
-	Uncompressed CompressionID = 1
-	CCIT1D       CompressionID = 2
-	CCITGroup3   CompressionID = 3
-	CCITGroup4   CompressionID = 4
-	LZW          CompressionID = 5
-	OJPEG        CompressionID = 6
-	JPEG         CompressionID = 7
-	PackBits     CompressionID = 32773
+	UndefinedCompression CompressionID = 0
+	Uncompressed         CompressionID = 1
+	CCIT1D               CompressionID = 2
+	CCITGroup3           CompressionID = 3
+	CCITGroup4           CompressionID = 4
+	LZW                  CompressionID = 5
+	OJPEG                CompressionID = 6
+	JPEG                 CompressionID = 7
+	PackBits             CompressionID = 32773
 )
 
 func (compressionID CompressionID) String() string {
