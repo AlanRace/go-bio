@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"log"
 	"sync"
+
+	tiffimage "github.com/AlanRace/go-bio/image"
 )
 
 type DataAccess interface {
@@ -70,7 +73,7 @@ func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) 
 	}
 	dataAccess.predictor = ifd.GetPredictor()
 
-	dataAccess.samplesPerPixel, err = ifd.GetShortTagValue(SamplesPerPixel)
+	dataAccess.samplesPerPixel, err = ifd.GetSamplesPerPixel()
 	if err != nil {
 		return err
 	}
@@ -165,7 +168,9 @@ func (dataAccess *baseDataAccess) GetData(section *Section) ([]byte, error) {
 	switch compression := dataAccess.compression.(type) {
 	case BinaryDecompressor:
 		var r io.Reader
-		byteData, err := dataAccess.GetCompressedData(section)
+		var byteData []byte
+
+		byteData, err = dataAccess.GetCompressedData(section)
 		if err != nil {
 			return nil, err
 		}
@@ -175,7 +180,7 @@ func (dataAccess *baseDataAccess) GetData(section *Section) ([]byte, error) {
 	case NoCompression:
 		data, err = dataAccess.GetCompressedData(section)
 	default:
-		return nil, fmt.Errorf("Can't use GetData when compression type is %T. Use GetImage instead", compression)
+		return nil, fmt.Errorf("can't use GetData when compression type is %T. Use GetImage instead", compression)
 	}
 
 	if err != nil {
@@ -227,7 +232,7 @@ type subImager interface {
 // GetImage returns an image for the section at the specified index. If the compression can decompress to an image directly,
 // this is returned (after cropping to the size of the section). If compression only supports binary, then the PhotometricInterpretation
 // in the tiff header is taken into account.
-func (dataAccess baseDataAccess) GetImage(section *Section) (image.Image, error) {
+func (dataAccess *baseDataAccess) GetImage(section *Section) (image.Image, error) {
 	switch compression := dataAccess.compression.(type) {
 	case ImageDecompressor:
 		var r io.Reader
@@ -254,7 +259,7 @@ func (dataAccess baseDataAccess) GetImage(section *Section) (image.Image, error)
 
 		simg, ok := img.(subImager)
 		if !ok {
-			return nil, fmt.Errorf("Image section at index %d is not same size as section and cannot be cropped (%T)", section.Index, img)
+			return nil, fmt.Errorf("image section at index %d is not same size as section and cannot be cropped (%T)", section.Index, img)
 		}
 
 		return simg.SubImage(image.Rect(0, 0, int(section.Width), int(section.Height))), nil
@@ -262,15 +267,15 @@ func (dataAccess baseDataAccess) GetImage(section *Section) (image.Image, error)
 	default:
 		switch dataAccess.GetPhotometricInterpretation() {
 		case BlackIsZero:
+			log.Println("[GetImage] using new BlackIsZero")
 			fullData, err := dataAccess.GetData(section)
 			if err != nil {
 				return nil, err
 			}
-			// TODO: This is pretty wasteful
 			rgbImg := image.NewRGBA(image.Rect(0, 0, int(section.Width), int(section.Height)))
-			data := make([]byte, len(fullData)*4)
+			data := make([]byte, len(fullData))
 
-			for i := 0; i < len(data)/4; i++ {
+			for i := 0; i < len(fullData); i++ {
 				data[i*4] = fullData[i]
 				data[i*4+1] = fullData[i]
 				data[i*4+2] = fullData[i]
@@ -280,21 +285,27 @@ func (dataAccess baseDataAccess) GetImage(section *Section) (image.Image, error)
 			rgbImg.Pix = data
 			return rgbImg, nil
 		case RGB:
+			log.Println("[GetImage] using new RGB")
+
 			fullData, err := dataAccess.GetData(section)
 			if err != nil {
 				return nil, err
 			}
-			rgbImg := image.NewRGBA(image.Rect(0, 0, int(section.Width), int(section.Height)))
-			data := make([]byte, len(fullData)/3*4)
+			// TODO: Create image from data to avoid copy?
+			rgbImg := tiffimage.NewRGB(image.Rect(0, 0, int(section.Width), int(section.Height)))
+			//data := make([]byte, len(fullData)/3*4)
 
-			for i := 0; i < len(data)/4; i++ {
-				data[i*4] = fullData[i*3]
-				data[i*4+1] = fullData[i*3+1]
-				data[i*4+2] = fullData[i*3+2]
-				data[i*4+3] = 255
+			for i := 0; i < len(fullData); i++ {
+				//data[i*4] = fullData[i*3]
+				//data[i*4+1] = fullData[i*3+1]
+				//data[i*4+2] = fullData[i*3+2]
+				//data[i*4+3] = 255
+				rgbImg.Pix[i] = fullData[i]
 			}
 
-			rgbImg.Pix = data
+			rgbImg.Pix = fullData
+
+			//rgbImg.Pix = data
 			// TODO: Should this be GetRGBA data?
 			//data, err := dataAccess.GetData(index)
 			//if err != nil {

@@ -3,6 +3,7 @@ package gobio
 import (
 	"encoding/binary"
 	"fmt"
+	"log"
 	"os"
 )
 
@@ -266,7 +267,28 @@ func (ifd *ImageFileDirectory) setUpDataAccess() error {
 	var err error
 
 	// Check if the data is tiled or stripped
-	if ifd.Tags[RowsPerStrip] != nil {
+	if ifd.Tags[TileWidth] != nil {
+		var dataAccess TileDataAccess
+		ifd.dataAccess = &dataAccess
+
+		err = dataAccess.initialiseDataAccess(ifd)
+		if err != nil {
+			return err
+		}
+
+		dataAccess.tileWidth = ifd.GetLongTagValue(TileWidth)
+		dataAccess.tileLength = ifd.GetLongTagValue(TileLength)
+
+		dataAccess.tilesAcross = (dataAccess.imageWidth + (dataAccess.tileWidth - 1)) / dataAccess.tileWidth
+		dataAccess.tilesDown = (dataAccess.imageLength + (dataAccess.tileLength - 1)) / dataAccess.tileLength
+
+		dataAccess.offsets, dataAccess.byteCounts, err = ifd.getTileOffsets(ifd)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	} else if ifd.Tags[RowsPerStrip] != nil {
 		var dataAccess StripDataAccess
 		ifd.dataAccess = &dataAccess
 
@@ -290,27 +312,6 @@ func (ifd *ImageFileDirectory) setUpDataAccess() error {
 		}
 
 		dataAccess.offsets, dataAccess.byteCounts, err = ifd.getStripOffsets(ifd)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	} else if ifd.Tags[TileWidth] != nil {
-		var dataAccess TileDataAccess
-		ifd.dataAccess = &dataAccess
-
-		err = dataAccess.initialiseDataAccess(ifd)
-		if err != nil {
-			return err
-		}
-
-		dataAccess.tileWidth = ifd.GetLongTagValue(TileWidth)
-		dataAccess.tileLength = ifd.GetLongTagValue(TileLength)
-
-		dataAccess.tilesAcross = (dataAccess.imageWidth + (dataAccess.tileWidth - 1)) / dataAccess.tileWidth
-		dataAccess.tilesDown = (dataAccess.imageLength + (dataAccess.tileLength - 1)) / dataAccess.tileLength
-
-		dataAccess.offsets, dataAccess.byteCounts, err = ifd.getTileOffsets(ifd)
 		if err != nil {
 			return err
 		}
@@ -434,7 +435,13 @@ func (ifd *ImageFileDirectory) GetBitsPerSample() (uint16, error) {
 }
 
 func (ifd *ImageFileDirectory) GetSamplesPerPixel() (uint16, error) {
-	return ifd.GetShortTagValue(SamplesPerPixel)
+	samplesPerPixel, err := ifd.GetShortTagValue(SamplesPerPixel)
+
+	if err != nil {
+		log.Printf("[GetSamplesPerPixel] Missing SamplesPerPixel, assuming 1: %v", err)
+		samplesPerPixel = 1
+	}
+	return samplesPerPixel, nil
 }
 
 func (ifd *ImageFileDirectory) GetCompression() (CompressionID, error) {

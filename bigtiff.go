@@ -155,7 +155,7 @@ func processBigASCIITag(seeker io.ReadSeeker, endian binary.ByteOrder, tagData *
 	data := make([]byte, tagData.DataCount)
 
 	if tagData.DataCount <= 4 {
-		log.Printf("NOT IMPLEMENTED: %s\n", string(tagData.DataOffset))
+		log.Printf("NOT IMPLEMENTED processBigASCIITag: %v\n", tagData)
 		//tag.data[0] = tagData.DataOffset
 	} else {
 		// TODO: Do something with the error

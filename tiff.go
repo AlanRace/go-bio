@@ -156,7 +156,7 @@ func processASCIITag(seeker io.ReadSeeker, endian binary.ByteOrder, tagData *tag
 	data := make([]byte, tagData.DataCount)
 
 	if tagData.DataCount <= 4 {
-		log.Printf("NOT IMPLEMENTED: %s\n", string(tagData.DataOffset))
+		log.Printf("NOT IMPLEMENTED processASCIITag: %v\n", tagData)
 		//tag.data[0] = tagData.DataOffset
 	} else {
 		// TODO: Do something with the error
@@ -274,12 +274,22 @@ func getTileOffsets(ifd *ImageFileDirectory) ([]int64, []int64, error) {
 
 	tileOffsetsTag, ok := ifd.Tags[TileOffsets].(*LongTag)
 	if !ok {
-		return nil, nil, &FormatError{msg: "Data stored as tiles, but TileOffsets appear to be missing"}
+		log.Println("Data stored as tiles, but TileOffsets appear to be missing, trying to use StripOffsets")
+		tileOffsetsTag, ok = ifd.Tags[StripOffsets].(*LongTag)
+
+		if !ok {
+			return nil, nil, &FormatError{msg: "Data stored as tiles, but TileOffsets and StripOffsets appear to be missing"}
+		}
 	}
 
 	tileByteCountsTag, ok := ifd.Tags[TileByteCounts].(*LongTag)
 	if !ok {
-		return nil, nil, &FormatError{msg: "Data stored as tiles, but TileByteCounts appear to be missing"}
+		log.Println("Data stored as tiles, but TileByteCounts appear to be missing, trying to use StripByteCounts")
+		tileByteCountsTag, ok = ifd.Tags[StripByteCounts].(*LongTag)
+
+		if !ok {
+			return nil, nil, &FormatError{msg: "Data stored as tiles, but TileByteCounts and StripByteCounts appear to be missing"}
+		}
 	}
 
 	for index := range tileOffsetsTag.Data {
