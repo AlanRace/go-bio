@@ -2,15 +2,12 @@ package gobio
 
 import (
 	"bufio"
-	"bytes"
-	"fmt"
 	"image"
 	"io"
 	"io/ioutil"
 
 	"golang.org/x/image/tiff/lzw"
-
-	"github.com/AlanRace/go-bio/libjpeg"
+	//"github.com/AlanRace/go-bio/libjpeg"
 )
 
 var compressionNameMap = map[CompressionID]string{
@@ -53,25 +50,25 @@ func init() {
 	AddCompression(LZW, "LZW", func(dataAccess TagAccess) (CompressionMethod, error) {
 		return &LZWCompression{}, nil
 	})
-	AddCompression(JPEG, "JPEG", func(dataAccess TagAccess) (CompressionMethod, error) {
-		if dataAccess.GetTag(JPEGTables) != nil {
-			tablesTag, ok := dataAccess.GetByteTag(JPEGTables) //.(*ByteTag)
-			if !ok {
-				return nil, &FormatError{msg: "JPEGTables not recorded as byte"}
-			}
+	// AddCompression(JPEG, "JPEG", func(dataAccess TagAccess) (CompressionMethod, error) {
+	// 	if dataAccess.GetTag(JPEGTables) != nil {
+	// 		tablesTag, ok := dataAccess.GetByteTag(JPEGTables) //.(*ByteTag)
+	// 		if !ok {
+	// 			return nil, &FormatError{msg: "JPEGTables not recorded as byte"}
+	// 		}
 
-			r := bytes.NewReader(tablesTag.Data)
+	// 		r := bytes.NewReader(tablesTag.Data)
 
-			ljpeg, err := libjpeg.NewJPEGFromHeader(r)
-			if err != nil {
-				return nil, fmt.Errorf("Failed parsing JPEG header (libjpeg) %w", err)
-			}
+	// 		ljpeg, err := libjpeg.NewJPEGFromHeader(r)
+	// 		if err != nil {
+	// 			return nil, fmt.Errorf("Failed parsing JPEG header (libjpeg) %w", err)
+	// 		}
 
-			return &JPEGCompression{ljpeg: ljpeg}, nil
-		}
+	// 		return &JPEGCompression{ljpeg: ljpeg}, nil
+	// 	}
 
-		return &JPEGCompression{ljpeg: libjpeg.NewJPEG()}, nil
-	})
+	// 	return &JPEGCompression{ljpeg: libjpeg.NewJPEG()}, nil
+	// })
 	AddCompression(PackBits, "PackBits", func(dataAccess TagAccess) (CompressionMethod, error) {
 		return &PackBitsCompression{}, nil
 	})
@@ -172,32 +169,32 @@ func unpackBits(r io.Reader) ([]byte, error) {
 	}
 }
 
-// JPEGCompression
-type JPEGCompression struct {
-	//header *jpeg.JPEGHeader
+// // JPEGCompression
+// type JPEGCompression struct {
+// 	//header *jpeg.JPEGHeader
 
-	ljpeg *libjpeg.JPEG
-}
+// 	ljpeg *libjpeg.JPEG
+// }
 
-func NewJPEGCompression(ljpeg *libjpeg.JPEG) *JPEGCompression {
-	return &JPEGCompression{ljpeg: ljpeg}
-}
+// func NewJPEGCompression(ljpeg *libjpeg.JPEG) *JPEGCompression {
+// 	return &JPEGCompression{ljpeg: ljpeg}
+// }
 
-// Decompress decompresses an io.Reader using the JPEG algorithm.
-func (compression *JPEGCompression) Decompress(r io.Reader) (image.Image, error) {
-	return compression.ljpeg.DecodeBody(r)
-}
+// // Decompress decompresses an io.Reader using the JPEG algorithm.
+// func (compression *JPEGCompression) Decompress(r io.Reader) (image.Image, error) {
+// 	return compression.ljpeg.DecodeBody(r)
+// }
 
-func (compression *JPEGCompression) SetPhotometricInterpretation(interpretation PhotometricInterpretationID) {
-	switch interpretation {
-	case RGB:
-		compression.ljpeg.RGBColourSpace()
-	case YCbCr:
-		compression.ljpeg.YCbCrColourSpace()
-	default:
-		panic("Unsupported photometric interpretation !" + interpretation.String())
-	}
-}
+// func (compression *JPEGCompression) SetPhotometricInterpretation(interpretation PhotometricInterpretationID) {
+// 	switch interpretation {
+// 	case RGB:
+// 		compression.ljpeg.RGBColourSpace()
+// 	case YCbCr:
+// 		compression.ljpeg.YCbCrColourSpace()
+// 	default:
+// 		panic("Unsupported photometric interpretation !" + interpretation.String())
+// 	}
+// }
 
 // Decompress decompresses the data supplied in the io.Reader using the compression method dictated by CompressionID.
 /*func (compressionID CompressionID) Decompress(r io.Reader, ifd *ImageFileDirectory) ([]byte, error) {

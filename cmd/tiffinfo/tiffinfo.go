@@ -78,7 +78,7 @@ func main() {
 				fmt.Println("Resolution not defined.")
 			}
 
-			fmt.Printf("%s\n", ifd.GetTag(tiff.ImageDescription))
+			//fmt.Printf("%s\n", ifd.GetTag(tiff.ImageDescription))
 			fmt.Println()
 
 			for tagID, tag := range ifd.Tags {

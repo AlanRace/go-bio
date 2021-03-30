@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"log"
 	"sync"
 )
 
@@ -93,7 +94,9 @@ func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) 
 			return &FormatError{msg: "Unsupported compression scheme " + dataAccess.compressionID.String() + " - missing function"}
 		}
 	} else {
-		return &FormatError{msg: "Unsupported compression scheme " + dataAccess.compressionID.String()}
+		log.Println("No compression scheme supplied, so assuming not compressed")
+		dataAccess.compression = Uncompressed
+		//return &FormatError{msg: "Unsupported compression scheme " + dataAccess.compressionID.String()}
 	}
 
 	return nil
@@ -237,10 +240,10 @@ func (dataAccess baseDataAccess) GetImage(section *Section) (image.Image, error)
 		}
 		r = bytes.NewReader(byteData)
 
-		jcompression, ok := compression.(*JPEGCompression)
-		if ok {
-			jcompression.SetPhotometricInterpretation(dataAccess.GetPhotometricInterpretation())
-		}
+		/*		jcompression, ok := compression.(*JPEGCompression)
+				if ok {
+					jcompression.SetPhotometricInterpretation(dataAccess.GetPhotometricInterpretation())
+				}*/
 
 		img, err := compression.Decompress(r)
 
