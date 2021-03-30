@@ -22,3 +22,9 @@ cmd/tiffinfo/tiffinfo
 test/libtiffpic/g3test.g3
 
 test/libtiffpic/README
+
+test/libtiffpic/CVS/
+
+test/libtiffpic/depth/CVS/
+
+test/libtiffpic/depth/

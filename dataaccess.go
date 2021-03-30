@@ -276,10 +276,7 @@ func (dataAccess *baseDataAccess) GetImage(section *Section) (image.Image, error
 			data := make([]byte, len(fullData))
 
 			for i := 0; i < len(fullData); i++ {
-				data[i*4] = fullData[i]
-				data[i*4+1] = fullData[i]
-				data[i*4+2] = fullData[i]
-				data[i*4+3] = 255
+				data[i] = fullData[i]
 			}
 
 			rgbImg.Pix = data

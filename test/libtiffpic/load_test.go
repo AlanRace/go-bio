@@ -31,9 +31,15 @@ func TestLoad(t *testing.T) {
 			defer tiffFile.Close()
 
 			if canContinue {
-				//for _, ifd := range tiffFile.GetIFDList() {
-				//fmt.Println(ifd)
-				//}
+				for index, ifd := range tiffFile.GetIFDList() {
+					section := ifd.GetSection(0)
+
+					_, err := section.GetImage()
+					if err != nil {
+						log.Printf("[ERROR] when processing IFD %d:  %v", index, err)
+						continue
+					}
+				}
 			}
 		}
 		return nil

@@ -47,6 +47,7 @@ const (
 	PhotometricInterpretation TagID = 262
 	Thresholding              TagID = 263
 	FillOrder                 TagID = 266
+	DocumentName              TagID = 269
 	ImageDescription          TagID = 270
 	// Make describes the make of the microscope used to acquire the data.
 	Make TagID = 271
@@ -81,6 +82,7 @@ const (
 	BadFaxLines                 TagID = 326
 	CleanFaxData                TagID = 327
 	ConsecutiveBadFaxLines      TagID = 328
+	InkSet                      TagID = 332
 	ExtraSamples                TagID = 338
 	SampleFormat                TagID = 339
 	SMinSampleValue             TagID = 340
@@ -98,9 +100,15 @@ const (
 	YCbCrPositioning            TagID = 531
 	ReferenceBlackWhite         TagID = 532
 
-	Copyright    TagID = 33432
-	ExifIFD      TagID = 34665
-	GDALMetadata TagID = 42112
+	Matteing           TagID = 32995
+	DataType           TagID = 32996
+	ImageDepth         TagID = 32997
+	TileDepth          TagID = 32998
+	Copyright          TagID = 33432
+	ExifIFD            TagID = 34665
+	StoNits            TagID = 37439
+	GDALMetadata       TagID = 42112
+	PrintImageMatching TagID = 50341
 
 	// Probable NDPI specific
 	//XOffsetFromSlideCentre TagID = 65422
@@ -118,6 +126,7 @@ var tagIDMap = map[uint16]TagID{
 	262: PhotometricInterpretation,
 	263: Thresholding,
 	266: FillOrder,
+	269: DocumentName,
 	270: ImageDescription,
 	271: Make,
 	272: Model,
@@ -148,6 +157,7 @@ var tagIDMap = map[uint16]TagID{
 	326: BadFaxLines,
 	327: CleanFaxData,
 	328: ConsecutiveBadFaxLines,
+	332: InkSet,
 	338: ExtraSamples,
 	339: SampleFormat,
 	340: SMinSampleValue,
@@ -165,9 +175,15 @@ var tagIDMap = map[uint16]TagID{
 	531: YCbCrPositioning,
 	532: ReferenceBlackWhite,
 
+	32995: Matteing,
+	32996: DataType,
+	32997: ImageDepth,
+	32998: TileDepth,
 	33432: Copyright,
 	34665: ExifIFD,
+	37439: StoNits,
 	42112: GDALMetadata,
+	50341: PrintImageMatching,
 
 	// NDPI specific?
 	//65422: XOffsetFromSlideCentre,
@@ -210,6 +226,8 @@ var tagNameMap = map[TagID]string{
 	NewSubFileType:              "NewSubFileType",
 	SubfileType:                 "SubfileType",
 	ImageDescription:            "ImageDescription",
+	DocumentName:                "DocumentName",
+	InkSet:                      "InkSet",
 	XPosition:                   "XPosition",
 	YPosition:                   "YPosition",
 	JPEGTables:                  "JPEGTables",
@@ -232,9 +250,15 @@ var tagNameMap = map[TagID]string{
 	ConsecutiveBadFaxLines:      "ConsecutiveBadFaxLines",
 	HalftoneHints:               "HalftoneHints",
 
-	Copyright:    "Copyright",
-	ExifIFD:      "ExifIFD",
-	GDALMetadata: "GDALMetadata",
+	Matteing:           "Matteing",
+	DataType:           "DataType",
+	ImageDepth:         "ImageDepth",
+	TileDepth:          "TileDepth",
+	Copyright:          "Copyright",
+	ExifIFD:            "ExifIFD",
+	StoNits:            "StoNits",
+	GDALMetadata:       "GDALMetadata",
+	PrintImageMatching: "PrintImageMatching",
 
 	// NDPI Specific?
 	//XOffsetFromSlideCentre: "XOffsetFromSlideCentre",
