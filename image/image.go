@@ -1,6 +1,7 @@
 package image
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"math/bits"
@@ -136,4 +137,123 @@ func NewRGB(r image.Rectangle) *RGB {
 		Stride: 3 * r.Dx(),
 		Rect:   r,
 	}
+}
+
+type RGB10 struct {
+	Pix    []byte
+	Stride int
+	Rect   image.Rectangle
+}
+
+func (p *RGB10) ColorModel() color.Model { return tiffcolor.RGB16Model }
+
+func (p *RGB10) Bounds() image.Rectangle { return p.Rect }
+
+func (p *RGB10) At(x, y int) color.Color {
+	return p.RGBAt(x, y)
+}
+
+var bitsRemaining = map[uint16]uint16{
+	10: 0b1111111111,
+	9:  0b1111111110,
+	8:  0b1111111100,
+	7:  0b1111111000,
+	6:  0b1111110000,
+	5:  0b1111100000,
+	4:  0b1111000000,
+	3:  0b1110000000,
+	2:  0b1100000000,
+	1:  0b1000000000,
+}
+
+func (p *RGB10) RGBAt(x, y int) tiffcolor.RGB16 {
+	if !(image.Point{x, y}.In(p.Rect)) {
+		return tiffcolor.RGB16{}
+	}
+
+	startByte, offset := p.PixOffset(x, y)
+	s := p.Pix //[startByte : startByte+6 : startByte+6] // Small cap improves performance, see https://golang.org/issue/27857f
+
+	remainingBits := uint16(10)
+	var r, g, b uint16
+
+	fmt.Printf("Processing %d, %d\n", x, y)
+
+	for remainingBits > 0 && remainingBits <= 10 {
+		for offset >= 8 {
+			offset -= 8
+			startByte++
+		}
+
+		temp := uint16(s[startByte]) >> offset
+		r = r | (temp & bitsRemaining[remainingBits])
+
+		processedBits := 8 - offset
+		fmt.Printf("[R = %d] -> %d, %d, %d, %d\n", r, startByte, temp, remainingBits, offset)
+		offset += processedBits
+
+		if processedBits > remainingBits {
+			break
+		}
+		remainingBits -= processedBits
+	}
+
+	remainingBits = 10
+
+	for remainingBits > 0 && remainingBits <= 10 {
+		for offset >= 8 {
+			offset -= 8
+			startByte++
+		}
+
+		temp := uint16(s[startByte]) >> offset
+		g = g | (temp & bitsRemaining[remainingBits])
+
+		processedBits := 8 - offset
+		fmt.Printf("[G = %d] -> %d, %d, %d, %d, %d\n", g, startByte, temp, remainingBits, processedBits, offset)
+		offset += processedBits
+
+		if processedBits > remainingBits {
+			break
+		}
+		remainingBits -= processedBits
+	}
+
+	remainingBits = 10
+
+	for remainingBits > 0 && remainingBits <= 10 {
+		for offset >= 8 {
+			offset -= 8
+			startByte++
+		}
+
+		temp := uint16(s[startByte]) >> offset
+		b = b | (temp & bitsRemaining[remainingBits])
+
+		processedBits := 8 - offset
+		offset += processedBits
+
+		fmt.Printf("[B = %d] -> %d, %d, %d, %d\n", b, startByte, temp, remainingBits, offset)
+		if processedBits > remainingBits {
+			break
+		}
+		remainingBits -= processedBits
+	}
+
+	fmt.Printf("(%d, %d) -> %d %d", x, y, startByte, offset)
+
+	return tiffcolor.RGB16{R: r, G: g, B: b}
+}
+
+// PixOffset returns the index of the first element of Pix that corresponds to
+// the pixel at (x, y).
+func (p *RGB10) PixOffset(x, y int) (int, uint16) {
+	index := (y-p.Rect.Min.Y)*(p.Rect.Max.X-p.Rect.Min.X) + (x - p.Rect.Min.X)
+	numBits := index * 30
+	remainder := numBits - ((numBits / 8) * 8)
+	fmt.Println(index)
+	fmt.Println(numBits)
+	fmt.Println(numBits / 8)
+	fmt.Println(remainder)
+	return numBits / 8, uint16(remainder)
 }

@@ -1,6 +1,6 @@
 module github.com/AlanRace/go-bio
 
-go 1.12
+go 1.13
 
 require (
 	github.com/hhrutter/lzw v0.0.0-20190829144645-6f07a24e8650

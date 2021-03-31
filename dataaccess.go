@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"image"
 	"io"
-	"log"
 	"sync"
 
 	tiffimage "github.com/AlanRace/go-bio/image"
@@ -267,50 +266,33 @@ func (dataAccess *baseDataAccess) GetImage(section *Section) (image.Image, error
 	default:
 		switch dataAccess.GetPhotometricInterpretation() {
 		case BlackIsZero:
-			log.Println("[GetImage] using new BlackIsZero")
-			fullData, err := dataAccess.GetData(section)
-			if err != nil {
-				return nil, err
-			}
-			rgbImg := image.NewRGBA(image.Rect(0, 0, int(section.Width), int(section.Height)))
-			data := make([]byte, len(fullData))
+			if dataAccess.bitsPerSample[0] != 8 {
+				return nil, &FormatError{msg: fmt.Sprintf("[GetImage] Unsupported BitsPerSample: %v", dataAccess.bitsPerSample)}
+			} else {
+				fullData, err := dataAccess.GetData(section)
+				if err != nil {
+					return nil, err
+				}
 
-			for i := 0; i < len(fullData); i++ {
-				data[i] = fullData[i]
-			}
+				greyImage := image.NewGray(image.Rect(0, 0, int(section.Width), int(section.Height)))
+				greyImage.Pix = fullData
 
-			rgbImg.Pix = data
-			return rgbImg, nil
+				return greyImage, nil
+			}
 		case RGB:
-			log.Println("[GetImage] using new RGB")
-
-			fullData, err := dataAccess.GetData(section)
-			if err != nil {
-				return nil, err
+			if dataAccess.bitsPerSample[0] != 8 {
+				return nil, &FormatError{msg: fmt.Sprintf("[GetImage] Unsupported BitsPerSample: %v", dataAccess.bitsPerSample)}
+			} else {
+				fullData, err := dataAccess.GetData(section)
+				if err != nil {
+					return nil, err
+				}
+				//fmt.Println(dataAccess.ifd.Tags)
+				//fmt.Println(section)
+				rgbImg := tiffimage.NewRGB(image.Rect(0, 0, int(section.Width), int(section.Height)))
+				rgbImg.Pix = fullData
+				return rgbImg, nil
 			}
-			// TODO: Create image from data to avoid copy?
-			rgbImg := tiffimage.NewRGB(image.Rect(0, 0, int(section.Width), int(section.Height)))
-			//data := make([]byte, len(fullData)/3*4)
-
-			for i := 0; i < len(fullData); i++ {
-				//data[i*4] = fullData[i*3]
-				//data[i*4+1] = fullData[i*3+1]
-				//data[i*4+2] = fullData[i*3+2]
-				//data[i*4+3] = 255
-				rgbImg.Pix[i] = fullData[i]
-			}
-
-			rgbImg.Pix = fullData
-
-			//rgbImg.Pix = data
-			// TODO: Should this be GetRGBA data?
-			//data, err := dataAccess.GetData(index)
-			//if err != nil {
-			//		return nil, err
-			//		}
-
-			//		img.Pix = data
-			return rgbImg, nil
 		default:
 			return nil, &FormatError{msg: "[GetImage] Unsupported PhotometricInterpretation: " + photometricInterpretationNameMap[dataAccess.GetPhotometricInterpretation()]}
 		}

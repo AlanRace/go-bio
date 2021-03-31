@@ -1,6 +1,10 @@
 package test
 
 import (
+	"fmt"
+	"image"
+	"image/draw"
+	"image/png"
 	"log"
 	"os"
 	"path/filepath"
@@ -32,13 +36,48 @@ func TestLoad(t *testing.T) {
 
 			if canContinue {
 				for index, ifd := range tiffFile.GetIFDList() {
-					section := ifd.GetSection(0)
+					width, height := ifd.GetImageDimensions()
+					outputImage := image.NewRGBA(image.Rect(0, 0, int(width), int(height)))
 
-					_, err := section.GetImage()
-					if err != nil {
-						log.Printf("[ERROR] when processing IFD %d:  %v", index, err)
-						continue
+					secWidth, secHeight := ifd.GetSectionDimensions()
+					secX, secY := ifd.GetSectionGrid()
+
+					curX := 0
+					curY := 0
+
+					for y := 0; y < int(secY); y++ {
+						for x := 0; x < int(secX); x++ {
+							section := ifd.GetSectionAt(int64(curX), int64(curY))
+							fmt.Println(section)
+							defer func() {
+								if r := recover(); r != nil {
+									log.Printf("[PANIC] when processing IFD %d:  %v", index, r)
+								}
+							}()
+
+							img, err := section.GetImage()
+							if err != nil {
+								log.Printf("[ERROR] when processing IFD %d:  %v", index, err)
+								continue
+							}
+
+							draw.Draw(outputImage, image.Rect(curX, curY, curX+int(secWidth), curY+int(secHeight)), img, image.Point{0, 0}, draw.Src)
+
+							curX += int(secWidth)
+						}
+
+						curX = 0
+						curY += int(secHeight)
 					}
+
+					f, err := os.Create(path[:len(path)-3] + "png")
+					if err != nil {
+						panic(err)
+					}
+					defer f.Close()
+					png.Encode(f, outputImage)
+
+					log.Printf("[SUCESS] when processing IFD %d", index)
 				}
 			}
 		}

@@ -35,9 +35,30 @@ func (c RGB) RGBA() (r, g, b, a uint32) {
 	return
 }
 
+// RGB16 represents represents 3 color, each having 16 bits for each of red, green and blue.
+type RGB16 struct {
+	R, G, B uint16
+}
+
+func (c RGB16) RGBA() (r, g, b, a uint32) {
+	r = uint32(c.R)
+	r |= r << 8
+
+	g = uint32(c.G)
+	g |= g << 8
+
+	b = uint32(c.B)
+	b |= b << 8
+
+	a = 0xffff
+
+	return
+}
+
 var (
 	Gray32Model color.Model = color.ModelFunc(gray32Model)
 	RGBModel    color.Model = color.ModelFunc(rgbModel)
+	RGB16Model  color.Model = color.ModelFunc(rgb16Model)
 )
 
 func gray32Model(c color.Color) color.Color {
@@ -67,4 +88,14 @@ func rgbModel(c color.Color) color.Color {
 	r, g, b, _ := c.RGBA()
 
 	return RGB{uint8(r >> 8), uint8(g >> 8), uint8(b >> 8)}
+}
+
+func rgb16Model(c color.Color) color.Color {
+	if _, ok := c.(RGB16); ok {
+		return c
+	}
+
+	r, g, b, _ := c.RGBA()
+
+	return RGB16{uint16(r >> 16), uint16(g >> 8), uint16(b >> 16)}
 }
