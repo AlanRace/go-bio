@@ -348,22 +348,22 @@ type GrayFloat32 struct {
 	MaxValue float32
 }
 
-func (p *GrayFloat32) ColorModel() color.Model { return tiffcolor.Gray32Model }
+func (p *GrayFloat32) ColorModel() color.Model { return color.Gray16Model }
 
 func (p *GrayFloat32) Bounds() image.Rectangle { return p.Rect }
 
 func (p *GrayFloat32) At(x, y int) color.Color {
-	return p.Gray32At(x, y)
+	return p.Gray16At(x, y)
 }
 
-func (p *GrayFloat32) Gray32At(x, y int) tiffcolor.Gray32 {
+func (p *GrayFloat32) Gray16At(x, y int) color.Gray16 {
 	if !(image.Point{x, y}.In(p.Rect)) {
-		return tiffcolor.Gray32{}
+		return color.Gray16{}
 	}
 
 	i := p.PixOffset(x, y)
 
-	return tiffcolor.Gray32{Y: uint32((p.Pix[i] / p.MaxValue) * float32(math.Pow(2, 16)))}
+	return color.Gray16{Y: uint16((p.Pix[i] / p.MaxValue) * 65535)} //65535
 }
 
 // PixOffset returns the index of the first element of Pix that corresponds to

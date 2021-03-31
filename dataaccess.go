@@ -288,12 +288,17 @@ func (dataAccess *baseDataAccess) GetImage(section *Section) (image.Image, error
 
 				// Need to update MaxValue to allow conversion to other colour formats
 				maxValue := float32(0)
+				minValue := float32(1e20)
 				for i := 0; i < len(greyImage.Pix); i++ {
 					if maxValue < greyImage.Pix[i] {
 						maxValue = greyImage.Pix[i]
 					}
+					if minValue > greyImage.Pix[i] {
+						minValue = greyImage.Pix[i]
+					}
 				}
 				greyImage.MaxValue = maxValue
+				greyImage.MinValue = minValue
 
 				return greyImage, err
 			default:

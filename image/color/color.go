@@ -42,13 +42,8 @@ type RGB16 struct {
 
 func (c RGB16) RGBA() (r, g, b, a uint32) {
 	r = uint32(c.R)
-	r |= r << 8
-
 	g = uint32(c.G)
-	g |= g << 8
-
 	b = uint32(c.B)
-	b |= b << 8
 
 	a = 0xffff
 
