@@ -2,6 +2,7 @@ package gobio
 
 import (
 	"bufio"
+	"compress/zlib"
 	"image"
 	"io"
 	"io/ioutil"
@@ -18,11 +19,14 @@ var compressionNameMap = map[CompressionID]string{
 	LZW:          "LZW",
 	OJPEG:        "OJPEG",
 	JPEG:         "JPEG",
+	AdobeDeflate: "AdobeDeflate",
+	JBIGBW:       "JBIG on black and white",
+	JBIGColour:   "JBIG on colour",
 	PackBits:     "PackBits",
 }
 
 var compressionTypeMap = map[uint16]CompressionID{
-	0:     Uncompressed,
+	//0:     Uncompressed,
 	1:     Uncompressed,
 	2:     CCIT1D,
 	3:     CCITGroup3,
@@ -30,6 +34,9 @@ var compressionTypeMap = map[uint16]CompressionID{
 	5:     LZW,
 	6:     OJPEG,
 	7:     JPEG,
+	8:     AdobeDeflate,
+	9:     JBIGBW,
+	10:    JBIGColour,
 	32773: PackBits,
 }
 
@@ -43,11 +50,14 @@ func AddCompression(id CompressionID, name string, create func(TagAccess) (Compr
 }
 
 func init() {
-	AddCompression(UndefinedCompression, "Uncompressed", func(dataAccess TagAccess) (CompressionMethod, error) {
+	/*AddCompression(UndefinedCompression, "Uncompressed", func(dataAccess TagAccess) (CompressionMethod, error) {
 		return &NoCompression{}, nil
-	})
+	})*/
 	AddCompression(Uncompressed, "Uncompressed", func(dataAccess TagAccess) (CompressionMethod, error) {
 		return &NoCompression{}, nil
+	})
+	AddCompression(AdobeDeflate, "AdobeDeflate", func(dataAccess TagAccess) (CompressionMethod, error) {
+		return &DeflateCompression{}, nil
 	})
 	AddCompression(LZW, "LZW", func(dataAccess TagAccess) (CompressionMethod, error) {
 		return &LZWCompression{}, nil
@@ -101,6 +111,21 @@ type NoCompression struct {
 // Decompress extracts bytes from io.Reader.
 func (*NoCompression) Decompress(r io.Reader) ([]byte, error) {
 	return ioutil.ReadAll(r)
+}
+
+// DeflateCompression performs LZW decompression of data.
+type DeflateCompression struct {
+}
+
+// Decompress decompresses an io.Reader using the LZW algorithm.
+func (*DeflateCompression) Decompress(r io.Reader) ([]byte, error) {
+	readCloser, err := zlib.NewReader(r)
+	if err != nil {
+		return nil, err
+	}
+	defer readCloser.Close()
+
+	return ioutil.ReadAll(readCloser)
 }
 
 // LZWCompression performs LZW decompression of data.

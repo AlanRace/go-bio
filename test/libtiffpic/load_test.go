@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	tiff "github.com/AlanRace/go-bio"
@@ -15,7 +16,7 @@ import (
 
 func TestLoad(t *testing.T) {
 
-	err := filepath.Walk("./", func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk("/home/alan/Documents/Nicole/Andreas/", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -37,6 +38,10 @@ func TestLoad(t *testing.T) {
 			if canContinue {
 				for index, ifd := range tiffFile.GetIFDList() {
 					width, height := ifd.GetImageDimensions()
+					if width > 4000 || height > 4000 {
+						continue
+					}
+
 					outputImage := image.NewRGBA(image.Rect(0, 0, int(width), int(height)))
 
 					secWidth, secHeight := ifd.GetSectionDimensions()
@@ -70,7 +75,7 @@ func TestLoad(t *testing.T) {
 						curY += int(secHeight)
 					}
 
-					f, err := os.Create(path[:len(path)-3] + "png")
+					f, err := os.Create(path[:len(path)-4] + "_IFD_" + strconv.Itoa(index) + ".png")
 					if err != nil {
 						panic(err)
 					}

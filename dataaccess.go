@@ -95,7 +95,7 @@ func (dataAccess *baseDataAccess) initialiseDataAccess(ifd *ImageFileDirectory) 
 			return &FormatError{msg: "Unsupported compression scheme " + dataAccess.compressionID.String() + " - missing function"}
 		}
 	} else {
-		return &FormatError{msg: "Unsupported compression scheme " + dataAccess.compressionID.String()}
+		return &FormatError{msg: fmt.Sprintf("Unsupported compression scheme: %v [%s]", dataAccess.ifd.Tags[Compression], dataAccess.compressionID.String())}
 	}
 
 	return nil
@@ -266,22 +266,42 @@ func (dataAccess *baseDataAccess) GetImage(section *Section) (image.Image, error
 	default:
 		switch dataAccess.GetPhotometricInterpretation() {
 		case BlackIsZero:
-			if dataAccess.bitsPerSample[0] != 8 {
-				return nil, &FormatError{msg: fmt.Sprintf("[GetImage] Unsupported BitsPerSample: %v", dataAccess.bitsPerSample)}
-			} else {
-				fullData, err := dataAccess.GetData(section)
-				if err != nil {
-					return nil, err
-				}
+			fullData, err := dataAccess.GetData(section)
+			if err != nil {
+				return nil, err
+			}
 
+			switch dataAccess.bitsPerSample[0] {
+			case 8:
 				greyImage := image.NewGray(image.Rect(0, 0, int(section.Width), int(section.Height)))
 				greyImage.Pix = fullData
 
 				return greyImage, nil
+			case 32:
+				buf := bytes.NewBuffer(fullData)
+
+				width, height := dataAccess.ifd.GetSectionDimensions()
+
+				greyImage := tiffimage.NewGrayFloat32(image.Rect(0, 0, int(width), int(height)))
+
+				err = binary.Read(buf, binary.LittleEndian, &greyImage.Pix)
+
+				// Need to update MaxValue to allow conversion to other colour formats
+				maxValue := float32(0)
+				for i := 0; i < len(greyImage.Pix); i++ {
+					if maxValue < greyImage.Pix[i] {
+						maxValue = greyImage.Pix[i]
+					}
+				}
+				greyImage.MaxValue = maxValue
+
+				return greyImage, err
+			default:
+				return nil, &FormatError{msg: fmt.Sprintf("[GetImage>BlackIsZero] Unsupported BitsPerSample: %v", dataAccess.bitsPerSample)}
 			}
 		case RGB:
 			if dataAccess.bitsPerSample[0] != 8 {
-				return nil, &FormatError{msg: fmt.Sprintf("[GetImage] Unsupported BitsPerSample: %v", dataAccess.bitsPerSample)}
+				return nil, &FormatError{msg: fmt.Sprintf("[GetImage>RGB] Unsupported BitsPerSample: %v", dataAccess.bitsPerSample)}
 			} else {
 				fullData, err := dataAccess.GetData(section)
 				if err != nil {
@@ -298,7 +318,7 @@ func (dataAccess *baseDataAccess) GetImage(section *Section) (image.Image, error
 					rgbImg.Pix = fullData
 					return rgbImg, nil
 				default:
-					return nil, &FormatError{msg: fmt.Sprintf("[GetImage] Unsupported SamplesPerPixel for RGB: %d", dataAccess.GetSamplesPerPixel())}
+					return nil, &FormatError{msg: fmt.Sprintf("[GetImage>RGB] Unsupported SamplesPerPixel for RGB: %d", dataAccess.GetSamplesPerPixel())}
 				}
 			}
 		default:

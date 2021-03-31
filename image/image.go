@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"math"
 	"math/bits"
 
 	tiffcolor "github.com/AlanRace/go-bio/image/color"
@@ -256,4 +257,168 @@ func (p *RGB10) PixOffset(x, y int) (int, uint16) {
 	fmt.Println(numBits / 8)
 	fmt.Println(remainder)
 	return numBits / 8, uint16(remainder)
+}
+
+type Gray32 struct {
+	Pix    []uint32
+	Stride int
+	Rect   image.Rectangle
+}
+
+func (p *Gray32) ColorModel() color.Model { return tiffcolor.Gray32Model }
+
+func (p *Gray32) Bounds() image.Rectangle { return p.Rect }
+
+func (p *Gray32) At(x, y int) color.Color {
+	return p.Gray32At(x, y)
+}
+
+func (p *Gray32) Gray32At(x, y int) tiffcolor.Gray32 {
+	if !(image.Point{x, y}.In(p.Rect)) {
+		return tiffcolor.Gray32{}
+	}
+
+	i := p.PixOffset(x, y)
+
+	return tiffcolor.Gray32{Y: p.Pix[i]}
+}
+
+// PixOffset returns the index of the first element of Pix that corresponds to
+// the pixel at (x, y).
+func (p *Gray32) PixOffset(x, y int) int {
+	return (y-p.Rect.Min.Y)*p.Stride + (x - p.Rect.Min.X)
+}
+
+func (p *Gray32) Set(x, y int, c color.Color) {
+	if !(image.Point{x, y}.In(p.Rect)) {
+		return
+	}
+
+	i := p.PixOffset(x, y)
+	c1 := tiffcolor.Gray32Model.Convert(c).(tiffcolor.Gray32)
+
+	p.Pix[i] = c1.Y
+}
+
+func (p *Gray32) SetGray32(x, y int, c tiffcolor.Gray32) {
+	if !(image.Point{x, y}.In(p.Rect)) {
+		return
+	}
+
+	i := p.PixOffset(x, y)
+	p.Pix[i] = c.Y
+}
+
+// SubImage returns an image representing the portion of the image p visible
+// through r. The returned value shares pixels with the original image.
+func (p *Gray32) SubImage(r image.Rectangle) image.Image {
+
+	r = r.Intersect(p.Rect)
+
+	// If r1 and r2 are Rectangles, r1.Intersect(r2) is not guaranteed to be inside
+	// either r1 or r2 if the intersection is empty. Without explicitly checking for
+	// this, the Pix[i:] expression below can panic.
+	if r.Empty() {
+		return &Gray32{}
+	}
+
+	i := p.PixOffset(r.Min.X, r.Min.Y)
+
+	return &Gray32{
+		Pix:    p.Pix[i:],
+		Stride: p.Stride,
+		Rect:   r,
+	}
+}
+
+// NewGray32 returns a new Gray32 image with the given bounds.
+func NewGray32(r image.Rectangle) *Gray32 {
+	return &Gray32{
+		Pix:    make([]uint32, pixelBufferLength(1, r, "Gray32")),
+		Stride: r.Dx(),
+		Rect:   r,
+	}
+}
+
+type GrayFloat32 struct {
+	Pix    []float32
+	Stride int
+	Rect   image.Rectangle
+
+	MaxValue float32
+}
+
+func (p *GrayFloat32) ColorModel() color.Model { return tiffcolor.Gray32Model }
+
+func (p *GrayFloat32) Bounds() image.Rectangle { return p.Rect }
+
+func (p *GrayFloat32) At(x, y int) color.Color {
+	return p.Gray32At(x, y)
+}
+
+func (p *GrayFloat32) Gray32At(x, y int) tiffcolor.Gray32 {
+	if !(image.Point{x, y}.In(p.Rect)) {
+		return tiffcolor.Gray32{}
+	}
+
+	i := p.PixOffset(x, y)
+
+	return tiffcolor.Gray32{Y: uint32((p.Pix[i] / p.MaxValue) * float32(math.Pow(2, 16)))}
+}
+
+// PixOffset returns the index of the first element of Pix that corresponds to
+// the pixel at (x, y).
+func (p *GrayFloat32) PixOffset(x, y int) int {
+	return (y-p.Rect.Min.Y)*p.Stride + (x - p.Rect.Min.X)
+}
+
+func (p *GrayFloat32) Set(x, y int, c color.Color) {
+	if !(image.Point{x, y}.In(p.Rect)) {
+		return
+	}
+
+	i := p.PixOffset(x, y)
+	c1 := tiffcolor.Gray32Model.Convert(c).(tiffcolor.Gray32)
+
+	p.Pix[i] = (float32(c1.Y) / float32(math.Pow(2, 16))) * p.MaxValue
+}
+
+func (p *GrayFloat32) SetGrayFloat32(x, y int, value float32) {
+	if !(image.Point{x, y}.In(p.Rect)) {
+		return
+	}
+
+	i := p.PixOffset(x, y)
+	p.Pix[i] = value
+}
+
+// SubImage returns an image representing the portion of the image p visible
+// through r. The returned value shares pixels with the original image.
+func (p *GrayFloat32) SubImage(r image.Rectangle) image.Image {
+
+	r = r.Intersect(p.Rect)
+
+	// If r1 and r2 are Rectangles, r1.Intersect(r2) is not guaranteed to be inside
+	// either r1 or r2 if the intersection is empty. Without explicitly checking for
+	// this, the Pix[i:] expression below can panic.
+	if r.Empty() {
+		return &GrayFloat32{}
+	}
+
+	i := p.PixOffset(r.Min.X, r.Min.Y)
+
+	return &GrayFloat32{
+		Pix:    p.Pix[i:],
+		Stride: p.Stride,
+		Rect:   r,
+	}
+}
+
+// NewGray32 returns a new Gray32 image with the given bounds.
+func NewGrayFloat32(r image.Rectangle) *GrayFloat32 {
+	return &GrayFloat32{
+		Pix:    make([]float32, pixelBufferLength(1, r, "GrayFloat32")),
+		Stride: r.Dx(),
+		Rect:   r,
+	}
 }
