@@ -74,9 +74,6 @@ func TestLoad(t *testing.T) {
 								if floatimg.MaxValue > maxValue {
 									maxValue = floatimg.MaxValue
 								}
-								if floatimg.MinValue < minValue {
-									minValue = floatimg.MinValue
-								}
 							}
 
 							curX += int(secWidth)
