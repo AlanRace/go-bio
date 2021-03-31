@@ -287,11 +287,19 @@ func (dataAccess *baseDataAccess) GetImage(section *Section) (image.Image, error
 				if err != nil {
 					return nil, err
 				}
-				//fmt.Println(dataAccess.ifd.Tags)
-				//fmt.Println(section)
-				rgbImg := tiffimage.NewRGB(image.Rect(0, 0, int(section.Width), int(section.Height)))
-				rgbImg.Pix = fullData
-				return rgbImg, nil
+
+				switch dataAccess.GetSamplesPerPixel() {
+				case 3:
+					rgbImg := tiffimage.NewRGB(image.Rect(0, 0, int(section.Width), int(section.Height)))
+					rgbImg.Pix = fullData
+					return rgbImg, nil
+				case 4:
+					rgbImg := image.NewRGBA(image.Rect(0, 0, int(section.Width), int(section.Height)))
+					rgbImg.Pix = fullData
+					return rgbImg, nil
+				default:
+					return nil, &FormatError{msg: fmt.Sprintf("[GetImage] Unsupported SamplesPerPixel for RGB: %d", dataAccess.GetSamplesPerPixel())}
+				}
 			}
 		default:
 			return nil, &FormatError{msg: "[GetImage] Unsupported PhotometricInterpretation: " + photometricInterpretationNameMap[dataAccess.GetPhotometricInterpretation()]}
